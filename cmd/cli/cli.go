@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/thanhfphan/blockchain/app"
 )
@@ -29,49 +28,49 @@ func (cli *CLI) validateArgs() {
 	}
 }
 
-func (cli *CLI) printChain() {
-	bc := app.NewBlockchain("")
-	defer bc.DB.Close()
+// func (cli *CLI) printChain() {
+// 	bc := app.NewBlockchain("")
+// 	defer bc.DB.Close()
 
-	bci := bc.Iterator()
+// 	bci := bc.Iterator()
 
-	for {
-		block := bci.Next()
+// 	for {
+// 		block := bci.Next()
 
-		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Hash: %x\n", block.Hash)
-		pow := app.NewProofOfWork(block)
-		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
-		fmt.Println()
+// 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
+// 		fmt.Printf("Hash: %x\n", block.Hash)
+// 		pow := app.NewProofOfWork(block)
+// 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
+// 		fmt.Println()
 
-		if len(block.PrevBlockHash) == 0 {
-			break
-		}
-	}
-}
+// 		if len(block.PrevBlockHash) == 0 {
+// 			break
+// 		}
+// 	}
+// }
 
-func (cli *CLI) send(from, to string, amount int) {
-	bc := app.NewBlockchain(from)
-	defer bc.DB.Close()
+// func (cli *CLI) send(from, to string, amount int) {
+// 	bc := app.NewBlockchain(from)
+// 	defer bc.DB.Close()
 
-	tx := app.NewUTXOTransaction(from, to, amount, bc)
-	bc.MineBlock([]*app.Transaction{tx})
-	fmt.Println("Success!")
-}
+// 	tx := app.NewUTXOTransaction(from, to, amount, bc)
+// 	bc.MineBlock([]*app.Transaction{tx})
+// 	fmt.Println("Success!")
+// }
 
-func (cli *CLI) getBalance(address string) {
-	bc := app.NewBlockchain(address)
-	defer bc.DB.Close()
+// func (cli *CLI) getBalance(address string) {
+// 	bc := app.NewBlockchain(address)
+// 	defer bc.DB.Close()
 
-	balance := 0
-	UTXOs := bc.FindUTXO(address)
+// 	balance := 0
+// 	UTXOs := bc.FindUTXO(address)
 
-	for _, out := range UTXOs {
-		balance += out.Value
-	}
+// 	for _, out := range UTXOs {
+// 		balance += out.Value
+// 	}
 
-	fmt.Printf("Balance of '%s': %d\n", address, balance)
-}
+// 	fmt.Printf("Balance of '%s': %d\n", address, balance)
+// }
 
 func (cli *CLI) createBlockchain(address string) {
 	bc := app.CreateBlockchain(address)
@@ -124,7 +123,7 @@ func (cli *CLI) Run() {
 			getBalanceCmd.Usage()
 			os.Exit(1)
 		}
-		cli.getBalance(*getBalanceAddress)
+		// cli.getBalance(*getBalanceAddress)
 	}
 
 	if createBlockchainCmd.Parsed() {
@@ -136,7 +135,7 @@ func (cli *CLI) Run() {
 	}
 
 	if printChainCmd.Parsed() {
-		cli.printChain()
+		// cli.printChain()
 	}
 
 	if sendCmd.Parsed() {
@@ -145,6 +144,6 @@ func (cli *CLI) Run() {
 			os.Exit(1)
 		}
 
-		cli.send(*sendFrom, *sendTo, *sendAmount)
+		// cli.send(*sendFrom, *sendTo, *sendAmount)
 	}
 }

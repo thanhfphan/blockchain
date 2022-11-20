@@ -1,3 +1,1 @@
-# blockchain
-
-A simple blockchain implementation
+# A simple blockchain implementation using Snow consensus
