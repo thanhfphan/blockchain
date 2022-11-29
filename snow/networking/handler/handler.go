@@ -1,13 +1,15 @@
 package handler
 
-type IHandler interface {
+var _ Handler = (*handler)(nil)
+
+type Handler interface {
 }
 
-type Handler struct {
+type handler struct {
 }
 
-func New() (IHandler, error) {
-	h := &Handler{}
+func New() (Handler, error) {
+	h := &handler{}
 
 	return h, nil
 }

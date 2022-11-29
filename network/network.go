@@ -6,6 +6,8 @@ import (
 	"github.com/thanhfphan/blockchain/network/peer"
 )
 
+var _ Network = (*network)(nil)
+
 type Network interface {
 }
 
