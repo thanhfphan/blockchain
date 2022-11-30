@@ -1,5 +1,10 @@
 package peer
 
+import (
+	"github.com/labstack/gommon/log"
+	"github.com/thanhfphan/blockchain/utils/sampler"
+)
+
 var _Set = (*set)(nil)
 
 type Set interface {
@@ -7,6 +12,7 @@ type Set interface {
 	GetByID(nodeID int) (Peer, bool)
 	Remove(nodeID int)
 	Len() int
+	Sample(n int, precondition func(Peer) bool) []Peer
 }
 
 type set struct {
@@ -58,4 +64,30 @@ func (s *set) Remove(nodeID int) {
 
 func (s *set) Len() int {
 	return len(s.peersSlice)
+}
+
+func (s *set) Sample(n int, precondition func(Peer) bool) []Peer {
+	if n <= 0 {
+		return nil
+	}
+
+	sampler := sampler.NewUniform()
+	sampler.Initialize(uint64(len(s.peersSlice)))
+
+	peers := make([]Peer, 0, n)
+	for len(peers) < n {
+		index, err := sampler.Next()
+		if err != nil {
+			log.Warnf("sample next failed %v", err)
+			break
+		}
+		peer := s.peersSlice[index]
+		if !precondition(peer) {
+			continue
+		}
+
+		peers = append(peers, peer)
+	}
+
+	return peers
 }

@@ -15,6 +15,10 @@ type Node struct {
 
 func (n *Node) Initialize() error {
 
+	if err := n.initNetworking(); err != nil {
+		log.Errorf("initNetworking err %v", err)
+		return err
+	}
 	return nil
 }
 
