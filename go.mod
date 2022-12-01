@@ -7,6 +7,8 @@ require (
 	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
+	golang.org/x/term v0.2.0 // indirect
+	gonum.org/v1/gonum v0.12.0 // indirect
 )
 
 require (

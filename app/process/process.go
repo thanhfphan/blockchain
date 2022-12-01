@@ -1,9 +1,21 @@
 package process
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/labstack/gommon/log"
 	"github.com/thanhfphan/blockchain/app"
 	"github.com/thanhfphan/blockchain/node"
+)
+
+const (
+	Header = `__________.__                 __   _________ .__           .__        
+\______   \  |   ____   ____ |  | _\_   ___ \|  |__ _____  |__| ____  
+ |    |  _/  |  /  _ \_/ ___\|  |/ /    \  \/|  |  \\__  \ |  |/    \ 
+ |    |   \  |_(  <_> )  \___|    <\     \___|   Y  \/ __ \|  |   |  \
+ |______  /____/\____/ \___  >__|_ \\______  /___|  (____  /__|___|  /
+        \/                 \/     \/       \/     \/     \/        \/ `
 )
 
 var (
@@ -11,7 +23,8 @@ var (
 )
 
 type Process struct {
-	node *node.Node
+	node   *node.Node
+	exitWG sync.WaitGroup
 }
 
 func NewApp() app.IApp {
@@ -26,6 +39,17 @@ func (p *Process) Start() error {
 		log.Warnf("init node failed %v", err)
 		return err
 	}
+
+	p.exitWG.Add(1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println("caught panic", r)
+			}
+			p.exitWG.Done()
+		}()
+	}()
+
 	return nil
 }
 
@@ -35,6 +59,6 @@ func (p *Process) Stop() error {
 }
 
 func (p *Process) ExitCode() (int, error) {
-
+	p.exitWG.Wait()
 	return p.node.ExitCode(), nil
 }

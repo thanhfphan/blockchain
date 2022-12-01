@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,12 +19,13 @@ type IApp interface {
 
 func Run(app IApp) int {
 	if err := app.Start(); err != nil {
+		fmt.Println("start app err", err)
 		return 1
 	}
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT)
-	signal.Notify(signals, syscall.SIGTERM)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGQUIT)
+	<-signals
 
 	var eg errgroup.Group
 	eg.Go(func() error {
