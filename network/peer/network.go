@@ -1,5 +1,8 @@
 package peer
 
 type Network interface {
-	Pong(nodeId int) (string, error)
+	Pong(nodeID int) (string, error)
+
+	Connected(nodeID int)
+	Disconnected(nodeID int)
 }
