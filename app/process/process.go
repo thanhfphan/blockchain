@@ -25,17 +25,19 @@ var (
 type Process struct {
 	node   *node.Node
 	exitWG sync.WaitGroup
+	config node.Config
 }
 
-func NewApp() app.IApp {
+func NewApp(config node.Config) app.IApp {
 	return &Process{
-		node: &node.Node{},
+		node:   &node.Node{},
+		config: config,
 	}
 }
 
 func (p *Process) Start() error {
 
-	if err := p.node.Initialize(); err != nil {
+	if err := p.node.Initialize(&p.config); err != nil {
 		log.Warnf("init node failed %v", err)
 		return err
 	}

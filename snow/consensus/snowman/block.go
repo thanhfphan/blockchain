@@ -29,3 +29,11 @@ func (n *snowmanBlock) AddChild(child Block) {
 
 	n.children[childID] = child
 }
+
+func (n *snowmanBlock) Accepted() bool {
+	if n.block == nil {
+		return false
+	}
+
+	return n.block.Status() == Accepted
+}

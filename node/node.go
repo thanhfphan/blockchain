@@ -4,21 +4,31 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/thanhfphan/blockchain/chains"
 	"github.com/thanhfphan/blockchain/network"
 
 	"github.com/labstack/gommon/log"
 )
 
 type Node struct {
-	Net network.Network
+	Net           network.Network
+	ChainsManager chains.Manager
+	Config        *Config
 }
 
-func (n *Node) Initialize() error {
-
+func (n *Node) Initialize(config *Config) error {
+	n.Config = config
 	if err := n.initNetworking(); err != nil {
-		log.Errorf("initNetworking err %v", err)
+		log.Warnf("initNetworking err %v", err)
 		return err
 	}
+	if err := n.initChainManager(); err != nil {
+		log.Warnf("init chain manager err %v", err)
+		return err
+	}
+
+	n.initChains()
+
 	return nil
 }
 
@@ -54,4 +64,24 @@ func (n *Node) initNetworking() error {
 	}
 
 	return nil
+}
+
+func (n *Node) initChainManager() error {
+	err := n.Config.ConsensusRouter.Initialize()
+	if err != nil {
+		return err
+	}
+	n.ChainsManager = chains.New(chains.ManagerConfig{
+		Net:    n.Net,
+		Router: n.Config.ConsensusRouter,
+	})
+	return nil
+}
+
+func (n *Node) initChains() {
+	fmt.Println("init chains")
+	n.ChainsManager.StartChainCreator(&chains.Chainparameters{
+		ID:          100,
+		GenesisData: []byte("genesis data"),
+	})
 }
