@@ -36,7 +36,6 @@ func NewApp(config node.Config) app.IApp {
 }
 
 func (p *Process) Start() error {
-
 	if err := p.node.Initialize(&p.config); err != nil {
 		log.Warnf("init node failed %v", err)
 		return err
@@ -56,7 +55,7 @@ func (p *Process) Start() error {
 }
 
 func (p *Process) Stop() error {
-	p.node.Shutdown()
+	p.node.Shutdown(0)
 	return nil
 }
 

@@ -1,4 +1,4 @@
-package snowman
+package snowball
 
 import "fmt"
 

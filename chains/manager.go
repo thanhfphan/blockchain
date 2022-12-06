@@ -1,11 +1,15 @@
 package chains
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	"github.com/thanhfphan/blockchain/network"
+	smConsensus "github.com/thanhfphan/blockchain/snow/consensus/snowman"
+	"github.com/thanhfphan/blockchain/snow/engine/common"
 	smEngine "github.com/thanhfphan/blockchain/snow/engine/snowman"
+	smBootstrap "github.com/thanhfphan/blockchain/snow/engine/snowman/bootstrap"
 	"github.com/thanhfphan/blockchain/snow/networking/handler"
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 )
@@ -78,6 +82,9 @@ func (m *manager) createChain(params *Chainparameters) {
 	m.chains[params.ID] = chain.Handler
 	m.chainsLock.Unlock()
 
+	m.ManagerConfig.Router.AddChain(context.Background(), chain.Handler)
+
+	chain.Handler.Start(context.TODO())
 	// TODO: notify other if needed
 }
 
@@ -98,10 +105,32 @@ func (m *manager) createSnowmanChain() (*chain, error) {
 		return nil, err
 	}
 
-	engine, err := smEngine.New()
+	//FIXME: Remove harcode
+	commonCfg := common.Config{
+		SampleK: 0,
+		Alpha:   0,
+	}
+
+	consensus := &smConsensus.Topological{}
+	engineConfig := smEngine.Config{
+		Consensus: consensus,
+	}
+
+	engine, err := smEngine.New(engineConfig)
 	if err != nil {
 		return nil, err
 	}
+	handler.SetConsensus(engine)
+
+	bootstrapperConfig := smBootstrap.Config{
+		Config: commonCfg,
+	}
+
+	bootstrapper, err := smBootstrap.New(context.TODO(), bootstrapperConfig)
+	if err != nil {
+		return nil, err
+	}
+	handler.SetBootstrapper(bootstrapper)
 
 	return &chain{
 		Engine:  engine,

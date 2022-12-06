@@ -17,8 +17,8 @@ type kahnNode struct {
 	degree int
 }
 
-func (t *Topological) Initialize(initPreference int) {
-
+func (t *Topological) Initialize() error {
+	return nil
 }
 
 func (t *Topological) Add(newChoice int) {

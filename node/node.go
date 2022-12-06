@@ -3,27 +3,33 @@ package node
 import (
 	"fmt"
 	"net"
-
-	"github.com/thanhfphan/blockchain/chains"
-	"github.com/thanhfphan/blockchain/network"
+	"sync"
 
 	"github.com/labstack/gommon/log"
+	"github.com/thanhfphan/blockchain/chains"
+	"github.com/thanhfphan/blockchain/network"
+	"github.com/thanhfphan/blockchain/utils"
 )
 
 type Node struct {
 	Net           network.Network
 	ChainsManager chains.Manager
 	Config        *Config
+
+	shuttingDown         utils.AtomicBool
+	shuttingDownExitCode utils.AtomicInterface
+	shutdownOnce         sync.Once
 }
 
 func (n *Node) Initialize(config *Config) error {
+	fmt.Println("initializing node")
 	n.Config = config
 	if err := n.initNetworking(); err != nil {
-		log.Warnf("initNetworking err %v", err)
+		fmt.Printf("initNetworking err %v\n", err)
 		return err
 	}
 	if err := n.initChainManager(); err != nil {
-		log.Warnf("init chain manager err %v", err)
+		fmt.Printf("init chain manager err %v\n", err)
 		return err
 	}
 
@@ -32,26 +38,30 @@ func (n *Node) Initialize(config *Config) error {
 	return nil
 }
 
-func (n *Node) Start() error {
-
-	return nil
-}
-
-func (n *Node) Stop() error {
-
-	return nil
-}
-
-func (n *Node) Shutdown() {
-
-}
-
 func (n *Node) ExitCode() int {
+	if exitCode, ok := n.shuttingDownExitCode.GetValue().(int); ok {
+		return exitCode
+	}
 	return 0
 }
 
-func (n *Node) initNetworking() error {
+func (n *Node) Shutdown(exitCode int) {
+	if !n.shuttingDown.GetValue() {
+		n.shuttingDownExitCode.SetValue(exitCode)
+	}
 
+	n.shuttingDown.SetValue(true)
+	n.shutdownOnce.Do(n.shutdown)
+}
+
+func (n *Node) shutdown() {
+	fmt.Println("shutting down node")
+
+	fmt.Println("finished shutdown")
+}
+
+func (n *Node) initNetworking() error {
+	fmt.Println("initializing networking")
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 3012))
 	if err != nil {
 		return err
@@ -67,6 +77,7 @@ func (n *Node) initNetworking() error {
 }
 
 func (n *Node) initChainManager() error {
+	fmt.Println("initializing chain manager")
 	err := n.Config.ConsensusRouter.Initialize()
 	if err != nil {
 		return err

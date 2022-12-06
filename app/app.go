@@ -32,7 +32,6 @@ func Run(app IApp) int {
 		for range signals {
 			return app.Stop()
 		}
-
 		return nil
 	})
 

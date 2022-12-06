@@ -1,7 +1,7 @@
 package snowman
 
 type Consensus interface {
-	Initialize(initPreference int)
+	Initialize() error
 	Add(newChoice int)
 	Preference() int
 	// TODO: RecordPoll

@@ -1,6 +1,10 @@
 package snowman
 
-import "time"
+import (
+	"time"
+
+	"github.com/thanhfphan/blockchain/snow/consensus/snowball"
+)
 
 type Block interface {
 	Decidable
@@ -13,14 +17,14 @@ type Block interface {
 type snowmanBlock struct {
 	block    Block
 	children map[int]Block
-	sb       Consensus
+	sb       snowball.Consensus
 }
 
 func (n *snowmanBlock) AddChild(child Block) {
 	childID := child.ID()
 
 	if n.sb == nil {
-		n.sb = &Tree{}
+		n.sb = &snowball.Tree{}
 		n.sb.Initialize(childID)
 		n.children = make(map[int]Block)
 	} else {
