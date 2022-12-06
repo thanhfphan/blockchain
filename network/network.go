@@ -14,6 +14,9 @@ var _ Network = (*network)(nil)
 type Network interface {
 	sender.ExternalSender
 	peer.Network
+
+	// Should only be called once, run until error occur or network closed
+	Dispath() error
 }
 
 type network struct {
@@ -76,6 +79,11 @@ func (n *network) Disconnected(nodeID int) {
 		n.connectedPeers.Remove(nodeID)
 		n.peersLock.Unlock()
 	}
+}
+
+func (n *network) Dispath() error {
+
+	return nil
 }
 
 func (n *network) getPeeers(nodeIDs []int) []peer.Peer {
