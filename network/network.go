@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
+	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
 var _ Network = (*network)(nil)
@@ -28,15 +30,30 @@ type network struct {
 	connectedPeers  peer.Set
 	listener        net.Listener
 
+	MyNodeID ids.NodeID
+	MyIPPort ips.IPPort
+
 	closeOnce        sync.Once
 	onCloseCtx       context.Context
 	onCloseCtxCancel func()
 }
 
 func New(listener net.Listener) (Network, error) {
-
 	onCloseCtx, cancel := context.WithCancel(context.Background())
+
+	ip, err := ips.ToIPPort(listener.Addr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	nID, err := ids.NodeIDFromIPPort(ip)
+	if err != nil {
+		return nil, err
+	}
+
 	n := &network{
+		MyIPPort:         ip,
+		MyNodeID:         nID,
 		listener:         listener,
 		connectingPeers:  peer.NewSet(),
 		connectedPeers:   peer.NewSet(),
@@ -47,22 +64,22 @@ func New(listener net.Listener) (Network, error) {
 	return n, nil
 }
 
-func (n *network) Send(msg string, nodeIDs []int) []int {
+func (n *network) Send(msg string, nodeIDs []ids.NodeID) []ids.NodeID {
 	peers := n.getPeeers(nodeIDs)
 	return n.send(msg, peers)
 }
 
-func (n *network) Gossip(msg string, numerPeersToSend int) []int {
+func (n *network) Gossip(msg string, numerPeersToSend int) []ids.NodeID {
 	peers := n.samplePeers(numerPeersToSend)
 	return n.send(msg, peers)
 }
 
-func (n *network) Pong(nodeID int) (string, error) {
+func (n *network) Pong(nodeID ids.NodeID) (string, error) {
 	return "", nil
 }
 
 // Call after handshake
-func (n *network) Connected(nodeID int) {
+func (n *network) Connected(nodeID ids.NodeID) {
 	n.peersLock.Lock()
 	peer, ok := n.connectingPeers.GetByID(nodeID)
 	if !ok {
@@ -75,7 +92,7 @@ func (n *network) Connected(nodeID int) {
 	n.peersLock.Unlock()
 }
 
-func (n *network) Disconnected(nodeID int) {
+func (n *network) Disconnected(nodeID ids.NodeID) {
 	n.peersLock.RLock()
 	_, isConnecting := n.connectingPeers.GetByID(nodeID)
 	_, isConnected := n.connectedPeers.GetByID(nodeID)
@@ -105,6 +122,24 @@ func (n *network) StartClose() {
 		defer n.peersLock.Unlock()
 
 		n.onCloseCtxCancel()
+
+		for i := 0; i < n.connectingPeers.Len(); i++ {
+			peer, err := n.connectingPeers.GetByIndex(i)
+			if err != nil {
+				fmt.Printf("get peer by index=%d failed\n", i)
+			} else {
+				peer.StartClose()
+			}
+		}
+
+		for i := 0; i < n.connectedPeers.Len(); i++ {
+			peer, err := n.connectedPeers.GetByIndex(i)
+			if err != nil {
+				fmt.Printf("get peer by index=%d failed\n", i)
+			} else {
+				peer.StartClose()
+			}
+		}
 	})
 }
 
@@ -123,14 +158,53 @@ func (n *network) Dispatch() error {
 		}
 
 		remoteAddr := conn.RemoteAddr().String()
-		fmt.Printf("Hello: %s\n", remoteAddr)
+		ip, err := ips.ToIPPort(remoteAddr)
+		if err != nil {
+			fmt.Printf("parse addr to ipport failed err=%v\n", err)
+			break
+		}
+		nodeID, err := ids.NodeIDFromIPPort(ip)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Hello: %s\n", nodeID.String())
 
+		go func() {
+			if err := n.upgrade(conn, nodeID); err != nil {
+				fmt.Printf("perr upgrade err=%v\n", err)
+			}
+		}()
 	}
 
 	return nil
 }
 
-func (n *network) getPeeers(nodeIDs []int) []peer.Peer {
+func (n *network) upgrade(conn net.Conn, nodeID ids.NodeID) error {
+
+	if nodeID.Equal(n.MyNodeID) {
+		fmt.Println("dropping connection to myslef")
+		return nil
+	}
+
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	if _, isConnecting := n.connectingPeers.GetByID(nodeID); isConnecting {
+		fmt.Printf("dropping connection because already connecting to peer=%s", nodeID.String())
+		return nil
+	}
+
+	if _, isConnected := n.connectedPeers.GetByID(nodeID); isConnected {
+		fmt.Printf("dropping connection because already connected to peer=%s", nodeID.String())
+		return nil
+	}
+
+	fmt.Printf("starting handle node=%s\n", nodeID)
+
+	return nil
+}
+
+func (n *network) getPeeers(nodeIDs []ids.NodeID) []peer.Peer {
 	peers := []peer.Peer{}
 
 	for _, nID := range nodeIDs {
@@ -145,8 +219,8 @@ func (n *network) getPeeers(nodeIDs []int) []peer.Peer {
 	return peers
 }
 
-func (n *network) send(msg string, peers []peer.Peer) []int {
-	sendTo := []int{}
+func (n *network) send(msg string, peers []peer.Peer) []ids.NodeID {
+	sendTo := []ids.NodeID{}
 
 	for _, peer := range peers {
 		ok := peer.Send(context.Background(), msg)

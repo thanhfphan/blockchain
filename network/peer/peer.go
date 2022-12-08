@@ -7,6 +7,9 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
+
+	"github.com/thanhfphan/blockchain/ids"
 )
 
 var (
@@ -15,21 +18,29 @@ var (
 )
 
 type Peer interface {
-	ID() int
+	ID() ids.NodeID
 	Send(ctx context.Context, message string) bool
+	StartClose()
 }
 
 type peer struct {
-	id           int
+	id           ids.NodeID
 	conn         net.Conn
 	messageQueue MessageQueue
+
+	startClosingOnce    sync.Once
+	onClosingCtx        context.Context
+	conClosingCtxCancel func()
 }
 
-func Start(conn net.Conn, msgQueue MessageQueue) Peer {
-
+func Start(conn net.Conn, nodeID ids.NodeID, msgQueue MessageQueue) Peer {
+	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
-		conn:         conn,
-		messageQueue: msgQueue,
+		id:                  nodeID,
+		conn:                conn,
+		messageQueue:        msgQueue,
+		onClosingCtx:        onClosingCtx,
+		conClosingCtxCancel: onClosingCtxCancel,
 	}
 
 	go p.readMessages()
@@ -38,8 +49,19 @@ func Start(conn net.Conn, msgQueue MessageQueue) Peer {
 	return p
 }
 
-func (p *peer) ID() int {
+func (p *peer) ID() ids.NodeID {
 	return p.id
+}
+
+func (p *peer) StartClose() {
+	p.startClosingOnce.Do(func() {
+		if err := p.conn.Close(); err != nil {
+			fmt.Printf("failed to close connection node=%s", p.ID().String())
+		}
+
+		p.messageQueue.Close()
+		p.conClosingCtxCancel()
+	})
 }
 
 func (p *peer) Send(ctx context.Context, msg string) bool {
@@ -53,6 +75,10 @@ func (p *peer) readMessages() {
 		msgBytes, err := io.ReadAll(reader)
 		if err != nil {
 			fmt.Printf("reading message in nodeId=%d failed %v\n", p.id, err)
+			return
+		}
+
+		if err := p.onClosingCtx.Err(); err != nil {
 			return
 		}
 

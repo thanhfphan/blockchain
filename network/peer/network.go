@@ -1,8 +1,10 @@
 package peer
 
-type Network interface {
-	Pong(nodeID int) (string, error)
+import "github.com/thanhfphan/blockchain/ids"
 
-	Connected(nodeID int)
-	Disconnected(nodeID int)
+type Network interface {
+	Pong(id ids.NodeID) (string, error)
+
+	Connected(id ids.NodeID)
+	Disconnected(ids ids.NodeID)
 }

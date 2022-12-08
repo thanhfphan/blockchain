@@ -80,10 +80,12 @@ func (n *Node) shutdown() {
 
 func (n *Node) initNetworking() error {
 	fmt.Println("initializing networking")
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 3012))
+	listener, err := net.Listen("tcp", ":0") // random port
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("finished init networking, addr: %s\n", listener.Addr().String())
 
 	n.Net, err = network.New(listener)
 	if err != nil {

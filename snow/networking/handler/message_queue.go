@@ -67,3 +67,7 @@ func (m *messageQueue) Shutdown() {
 
 	m.cond.Broadcast()
 }
+
+func (m *messageQueue) Close() {
+	//TODO: flush all the messages
+}
