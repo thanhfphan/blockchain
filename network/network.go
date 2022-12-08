@@ -2,8 +2,10 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
@@ -16,19 +18,30 @@ type Network interface {
 	peer.Network
 
 	// Should only be called once, run until error occur or network closed
-	Dispath() error
+	Dispatch() error
+	StartClose()
 }
 
 type network struct {
 	peersLock       sync.RWMutex
 	connectingPeers peer.Set
 	connectedPeers  peer.Set
+	listener        net.Listener
+
+	closeOnce        sync.Once
+	onCloseCtx       context.Context
+	onCloseCtxCancel func()
 }
 
 func New(listener net.Listener) (Network, error) {
+
+	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
-		connectingPeers: peer.NewSet(),
-		connectedPeers:  peer.NewSet(),
+		listener:         listener,
+		connectingPeers:  peer.NewSet(),
+		connectedPeers:   peer.NewSet(),
+		onCloseCtx:       onCloseCtx,
+		onCloseCtxCancel: cancel,
 	}
 
 	return n, nil
@@ -81,7 +94,38 @@ func (n *network) Disconnected(nodeID int) {
 	}
 }
 
-func (n *network) Dispath() error {
+func (n *network) StartClose() {
+	n.closeOnce.Do(func() {
+		fmt.Println("shutting down the p2p networking")
+		if err := n.listener.Close(); err != nil {
+			fmt.Printf("close the network listener err=%v\n", err)
+		}
+
+		n.peersLock.Lock()
+		defer n.peersLock.Unlock()
+
+		n.onCloseCtxCancel()
+	})
+}
+
+func (n *network) Dispatch() error {
+
+	for {
+		if n.onCloseCtx.Err() != nil {
+			break
+		}
+
+		conn, err := n.listener.Accept()
+		if err != nil {
+			fmt.Printf("listen connection err=%v\n", err)
+			time.Sleep(time.Millisecond)
+			continue
+		}
+
+		remoteAddr := conn.RemoteAddr().String()
+		fmt.Printf("Hello: %s\n", remoteAddr)
+
+	}
 
 	return nil
 }

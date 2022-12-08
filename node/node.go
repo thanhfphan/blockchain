@@ -5,7 +5,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/labstack/gommon/log"
 	"github.com/thanhfphan/blockchain/chains"
 	"github.com/thanhfphan/blockchain/network"
 	"github.com/thanhfphan/blockchain/utils"
@@ -19,10 +18,15 @@ type Node struct {
 	shuttingDown         utils.AtomicBool
 	shuttingDownExitCode utils.AtomicInterface
 	shutdownOnce         sync.Once
+
+	doneShuttingDown sync.WaitGroup
 }
 
 func (n *Node) Initialize(config *Config) error {
 	fmt.Println("initializing node")
+
+	n.doneShuttingDown.Add(1)
+
 	n.Config = config
 	if err := n.initNetworking(); err != nil {
 		fmt.Printf("initNetworking err %v\n", err)
@@ -45,6 +49,16 @@ func (n *Node) ExitCode() int {
 	return 0
 }
 
+func (n *Node) Dispatch() error {
+
+	n.Net.Dispatch()
+	n.Shutdown(1)
+
+	n.doneShuttingDown.Wait()
+
+	return nil
+}
+
 func (n *Node) Shutdown(exitCode int) {
 	if !n.shuttingDown.GetValue() {
 		n.shuttingDownExitCode.SetValue(exitCode)
@@ -56,6 +70,10 @@ func (n *Node) Shutdown(exitCode int) {
 
 func (n *Node) shutdown() {
 	fmt.Println("shutting down node")
+
+	n.Net.StartClose()
+
+	n.doneShuttingDown.Done()
 
 	fmt.Println("finished shutdown")
 }
@@ -69,7 +87,7 @@ func (n *Node) initNetworking() error {
 
 	n.Net, err = network.New(listener)
 	if err != nil {
-		log.Warnf("init network failed %v", err)
+		fmt.Printf("init network failed %v\n", err)
 		return err
 	}
 

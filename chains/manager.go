@@ -107,8 +107,8 @@ func (m *manager) createSnowmanChain() (*chain, error) {
 
 	//FIXME: Remove harcode
 	commonCfg := common.Config{
-		SampleK: 0,
-		Alpha:   0,
+		SampleK: 1,
+		Alpha:   1,
 	}
 
 	consensus := &smConsensus.Topological{}

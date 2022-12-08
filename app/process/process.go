@@ -49,6 +49,9 @@ func (p *Process) Start() error {
 			}
 			p.exitWG.Done()
 		}()
+
+		err := p.node.Dispatch()
+		fmt.Printf("dispatch returned err=%v\n", err)
 	}()
 
 	return nil

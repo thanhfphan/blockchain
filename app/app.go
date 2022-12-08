@@ -25,7 +25,6 @@ func Run(app IApp) int {
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGQUIT)
-	<-signals
 
 	var eg errgroup.Group
 	eg.Go(func() error {
