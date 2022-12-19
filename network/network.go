@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/thanhfphan/blockchain/ids"
+	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
 	"github.com/thanhfphan/blockchain/utils/ips"
@@ -25,6 +26,8 @@ type Network interface {
 }
 
 type network struct {
+	config          *Config
+	peerConfig      *peer.Config
 	peersLock       sync.RWMutex
 	connectingPeers peer.Set
 	connectedPeers  peer.Set
@@ -38,7 +41,7 @@ type network struct {
 	onCloseCtxCancel func()
 }
 
-func New(listener net.Listener) (Network, error) {
+func New(config *Config, listener net.Listener) (Network, error) {
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 
 	ip, err := ips.ToIPPort(listener.Addr().String())
@@ -51,7 +54,17 @@ func New(listener net.Listener) (Network, error) {
 		return nil, err
 	}
 
+	msgCreator, err := message.NewCreator()
+	if err != nil {
+		return nil, err
+	}
+	peerConfig := &peer.Config{
+		MessageCreator: msgCreator,
+	}
+
 	n := &network{
+		config:           config,
+		peerConfig:       peerConfig,
 		MyIPPort:         ip,
 		MyNodeID:         nID,
 		listener:         listener,
@@ -201,6 +214,8 @@ func (n *network) upgrade(conn net.Conn, nodeID ids.NodeID) error {
 
 	fmt.Printf("starting handle node=%s\n", nodeID)
 
+	peer := peer.Start(n.peerConfig, conn, nodeID, nil) //FIXME
+	n.connectingPeers.Add(peer)
 	return nil
 }
 

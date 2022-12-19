@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/thanhfphan/blockchain/ids"
+	"github.com/thanhfphan/blockchain/message"
 )
 
 var (
@@ -24,6 +25,7 @@ type Peer interface {
 }
 
 type peer struct {
+	*Config
 	id           ids.NodeID
 	conn         net.Conn
 	messageQueue MessageQueue
@@ -33,9 +35,10 @@ type peer struct {
 	conClosingCtxCancel func()
 }
 
-func Start(conn net.Conn, nodeID ids.NodeID, msgQueue MessageQueue) Peer {
+func Start(config *Config, conn net.Conn, nodeID ids.NodeID, msgQueue MessageQueue) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
+		Config:              config,
 		id:                  nodeID,
 		conn:                conn,
 		messageQueue:        msgQueue,
@@ -69,7 +72,7 @@ func (p *peer) Send(ctx context.Context, msg string) bool {
 }
 
 func (p *peer) readMessages() {
-	reader := bufio.NewReaderSize(p.conn, PeerBufferSize)
+	reader := bufio.NewReader(p.conn)
 
 	for {
 		msgBytes, err := io.ReadAll(reader)
@@ -82,11 +85,17 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		p.handle(string(msgBytes))
+		msg, err := p.MessageCreator.Parse(msgBytes, p.id)
+		if err != nil {
+			fmt.Printf("failed to parse message %v, err=%v", string(msgBytes), err)
+			continue
+		}
+
+		p.handle(msg)
 	}
 }
 
-func (p *peer) handle(msg string) {
+func (p *peer) handle(msg message.InboundMessage) {
 	fmt.Printf("handle msg=%s\n", msg)
 }
 

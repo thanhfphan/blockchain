@@ -87,7 +87,9 @@ func (n *Node) initNetworking() error {
 
 	fmt.Printf("finished init networking, addr: %s\n", listener.Addr().String())
 
-	n.Net, err = network.New(listener)
+	nConfig := &network.Config{}
+
+	n.Net, err = network.New(nConfig, listener)
 	if err != nil {
 		fmt.Printf("init network failed %v\n", err)
 		return err

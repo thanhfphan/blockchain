@@ -21,5 +21,6 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 }
 
 func (b *bootstrapper) Startup(ctx context.Context) error {
+	// TODO: get nodes by make http request server, then use it to bootstrap here
 	return nil
 }

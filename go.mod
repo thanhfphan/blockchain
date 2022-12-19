@@ -1,6 +1,6 @@
 module github.com/thanhfphan/blockchain
 
-go 1.17
+go 1.18
 
 require (
 	golang.org/x/term v0.2.0
