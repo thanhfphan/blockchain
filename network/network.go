@@ -11,10 +11,13 @@ import (
 	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
-	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
 var _ Network = (*network)(nil)
+
+const (
+	maxMessageInQueue = 1024
+)
 
 type Network interface {
 	sender.ExternalSender
@@ -33,8 +36,8 @@ type network struct {
 	connectedPeers  peer.Set
 	listener        net.Listener
 
-	MyNodeID ids.NodeID
-	MyIPPort ips.IPPort
+	serverUpgrader peer.Upgrader
+	clientUpgrader peer.Upgrader
 
 	closeOnce        sync.Once
 	onCloseCtx       context.Context
@@ -42,47 +45,42 @@ type network struct {
 }
 
 func New(config *Config, listener net.Listener) (Network, error) {
-	onCloseCtx, cancel := context.WithCancel(context.Background())
-
-	ip, err := ips.ToIPPort(listener.Addr().String())
-	if err != nil {
-		return nil, err
-	}
-
-	nID, err := ids.NodeIDFromIPPort(ip)
-	if err != nil {
-		return nil, err
-	}
-
 	msgCreator, err := message.NewCreator()
 	if err != nil {
 		return nil, err
 	}
+
+	onCloseCtx, cancel := context.WithCancel(context.Background())
 	peerConfig := &peer.Config{
 		MessageCreator: msgCreator,
+		PongTimeout:    30 * time.Second,
 	}
 
 	n := &network{
-		config:           config,
-		peerConfig:       peerConfig,
-		MyIPPort:         ip,
-		MyNodeID:         nID,
-		listener:         listener,
-		connectingPeers:  peer.NewSet(),
-		connectedPeers:   peer.NewSet(),
+		config:          config,
+		peerConfig:      peerConfig,
+		listener:        listener,
+		connectingPeers: peer.NewSet(),
+		connectedPeers:  peer.NewSet(),
+
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
+
+		clientUpgrader: peer.NewClientUpgrader(config.TLSConfig),
+		serverUpgrader: peer.NewServerUpgrader(config.TLSConfig),
 	}
+
+	n.peerConfig.Network = n
 
 	return n, nil
 }
 
-func (n *network) Send(msg string, nodeIDs []ids.NodeID) []ids.NodeID {
+func (n *network) Send(msg message.OutboundMessage, nodeIDs []ids.NodeID) []ids.NodeID {
 	peers := n.getPeeers(nodeIDs)
 	return n.send(msg, peers)
 }
 
-func (n *network) Gossip(msg string, numerPeersToSend int) []ids.NodeID {
+func (n *network) Gossip(msg message.OutboundMessage, numerPeersToSend int) []ids.NodeID {
 	peers := n.samplePeers(numerPeersToSend)
 	return n.send(msg, peers)
 }
@@ -156,6 +154,7 @@ func (n *network) StartClose() {
 	})
 }
 
+// Dispatch start to accepting connections from other nodes to connect to this node
 func (n *network) Dispatch() error {
 
 	for {
@@ -170,20 +169,8 @@ func (n *network) Dispatch() error {
 			continue
 		}
 
-		remoteAddr := conn.RemoteAddr().String()
-		ip, err := ips.ToIPPort(remoteAddr)
-		if err != nil {
-			fmt.Printf("parse addr to ipport failed err=%v\n", err)
-			break
-		}
-		nodeID, err := ids.NodeIDFromIPPort(ip)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Hello: %s\n", nodeID.String())
-
 		go func() {
-			if err := n.upgrade(conn, nodeID); err != nil {
+			if err := n.upgrade(conn, n.serverUpgrader); err != nil {
 				fmt.Printf("perr upgrade err=%v\n", err)
 			}
 		}()
@@ -192,10 +179,23 @@ func (n *network) Dispatch() error {
 	return nil
 }
 
-func (n *network) upgrade(conn net.Conn, nodeID ids.NodeID) error {
+func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
+	nodeID, tlsConn, cert, err := upgrader.Upgrader(conn)
+	if err != nil {
+		_ = conn.Close()
+		fmt.Printf("upgrade connection failed %v\n", err)
+		return err
+	}
 
-	if nodeID.Equal(n.MyNodeID) {
-		fmt.Println("dropping connection to myslef")
+	if err := tlsConn.SetReadDeadline(time.Time{}); err != nil {
+		_ = tlsConn.Close()
+		fmt.Printf("set readDeadLine failed %v\n", err)
+		return err
+	}
+
+	if nodeID == n.config.MyNodeID {
+		_ = tlsConn.Close()
+		fmt.Printf("dropping connection to myslef\n")
 		return nil
 	}
 
@@ -212,9 +212,7 @@ func (n *network) upgrade(conn net.Conn, nodeID ids.NodeID) error {
 		return nil
 	}
 
-	fmt.Printf("starting handle node=%s\n", nodeID)
-
-	peer := peer.Start(n.peerConfig, conn, nodeID, nil) //FIXME
+	peer := peer.Start(n.peerConfig, conn, cert, nodeID, peer.NewBlockingQueue(maxMessageInQueue))
 	n.connectingPeers.Add(peer)
 	return nil
 }
@@ -234,11 +232,11 @@ func (n *network) getPeeers(nodeIDs []ids.NodeID) []peer.Peer {
 	return peers
 }
 
-func (n *network) send(msg string, peers []peer.Peer) []ids.NodeID {
+func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) []ids.NodeID {
 	sendTo := []ids.NodeID{}
 
 	for _, peer := range peers {
-		ok := peer.Send(context.Background(), msg)
+		ok := peer.Send(n.onCloseCtx, msg)
 		if ok {
 			sendTo = append(sendTo, peer.ID())
 		}

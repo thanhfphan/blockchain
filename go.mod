@@ -3,6 +3,7 @@ module github.com/thanhfphan/blockchain
 go 1.18
 
 require (
+	github.com/mr-tron/base58 v1.2.0
 	golang.org/x/term v0.2.0
 	gonum.org/v1/gonum v0.12.0
 )

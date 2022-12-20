@@ -2,12 +2,14 @@ package peer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/message"
@@ -20,7 +22,7 @@ var (
 
 type Peer interface {
 	ID() ids.NodeID
-	Send(ctx context.Context, message string) bool
+	Send(ctx context.Context, message message.OutboundMessage) bool
 	StartClose()
 }
 
@@ -28,6 +30,7 @@ type peer struct {
 	*Config
 	id           ids.NodeID
 	conn         net.Conn
+	cert         *x509.Certificate
 	messageQueue MessageQueue
 
 	startClosingOnce    sync.Once
@@ -35,12 +38,18 @@ type peer struct {
 	conClosingCtxCancel func()
 }
 
-func Start(config *Config, conn net.Conn, nodeID ids.NodeID, msgQueue MessageQueue) Peer {
+func Start(
+	config *Config,
+	conn net.Conn,
+	cert *x509.Certificate,
+	nodeID ids.NodeID,
+	msgQueue MessageQueue) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
 		Config:              config,
 		id:                  nodeID,
 		conn:                conn,
+		cert:                cert,
 		messageQueue:        msgQueue,
 		onClosingCtx:        onClosingCtx,
 		conClosingCtxCancel: onClosingCtxCancel,
@@ -67,7 +76,7 @@ func (p *peer) StartClose() {
 	})
 }
 
-func (p *peer) Send(ctx context.Context, msg string) bool {
+func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
@@ -123,8 +132,14 @@ func (p *peer) writeMessages() {
 	}
 }
 
-func (p *peer) writeMessage(writer *bufio.Writer, msg string) {
-	if _, err := io.Copy(writer, strings.NewReader(msg)); err != nil {
+func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
+	msgBytes := msg.Bytes()
+
+	if err := p.conn.SetWriteDeadline(time.Now().Add(p.PongTimeout)); err != nil {
+		fmt.Printf("set writeDeadLine failed %v\n", err)
+		return
+	}
+	if _, err := io.Copy(writer, bytes.NewReader(msgBytes)); err != nil {
 		fmt.Printf("error writing message %v\n", err)
 		return
 	}

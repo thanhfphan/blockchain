@@ -1,8 +1,11 @@
 package sender
 
-import "github.com/thanhfphan/blockchain/ids"
+import (
+	"github.com/thanhfphan/blockchain/ids"
+	"github.com/thanhfphan/blockchain/message"
+)
 
 type ExternalSender interface {
-	Send(msg string, nodeIDs []ids.NodeID) []ids.NodeID
-	Gossip(msg string, numPeersToSend int) []ids.NodeID
+	Send(msg message.OutboundMessage, nodeIDs []ids.NodeID) []ids.NodeID
+	Gossip(msg message.OutboundMessage, numPeersToSend int) []ids.NodeID
 }

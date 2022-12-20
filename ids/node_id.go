@@ -1,21 +1,43 @@
 package ids
 
 import (
-	"fmt"
+	"crypto/x509"
 
-	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/hashing"
 )
 
-type NodeID int
+const (
+	NodeIDPrefix = "NodeID-"
+)
+
+type NodeID ID
+
+func (id NodeID) Bytes() []byte {
+	return id[:]
+}
 
 func (id NodeID) String() string {
-	return fmt.Sprintf("NodeID-%d", id)
+	return NodeID(id).PrefixedString(NodeIDPrefix)
 }
 
-func NodeIDFromIPPort(ip ips.IPPort) (NodeID, error) {
-	return NodeID(ip.Port), nil
+func (id NodeID) PrefixedString(prefix string) string {
+	return prefix + id.String()
 }
 
-func (id NodeID) Equal(other NodeID) bool {
-	return id == other
+func ToNodeID(bytes []byte) (NodeID, error) {
+	nodeID, err := ToID(bytes)
+	return NodeID(nodeID), err
+}
+
+func NodeIDFromCert(cert *x509.Certificate) NodeID {
+	return hashing.ComputeHash256Array(cert.Raw)
+}
+
+func NodeIDFromString(idStr string) (NodeID, error) {
+	id, err := IDFromPrefixedString(idStr, NodeIDPrefix)
+	if err != nil {
+		return NodeID{}, err
+	}
+
+	return NodeID(id), nil
 }
