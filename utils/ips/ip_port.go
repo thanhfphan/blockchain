@@ -12,6 +12,10 @@ type IPPort struct {
 	Port uint16 `json:"port"`
 }
 
+func (ip IPPort) Equal(other IPPort) bool {
+	return ip.Port == other.Port && ip.IP.Equal(other.IP)
+}
+
 func (ip IPPort) String() string {
 	return net.JoinHostPort(ip.IP.String(), fmt.Sprintf("%d", ip.Port))
 }

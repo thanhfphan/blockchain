@@ -1,14 +1,18 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/thanhfphan/blockchain/app/runner"
-	"github.com/thanhfphan/blockchain/node"
-	"github.com/thanhfphan/blockchain/snow/networking/router"
+	"github.com/thanhfphan/blockchain/config"
 )
 
 func main() {
-	nodeConfig := node.Config{
-		ConsensusRouter: &router.ChainRouter{},
+	cfg, err := config.GetNodeConfig()
+	if err != nil {
+		fmt.Printf("get nodeConfig with err=%v", err)
+		return
 	}
-	runner.Run(nodeConfig)
+
+	runner.Run(cfg)
 }

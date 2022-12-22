@@ -6,11 +6,15 @@ import (
 	"sync"
 
 	"github.com/thanhfphan/blockchain/chains"
+	"github.com/thanhfphan/blockchain/ids"
+	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/network"
+	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/utils"
 )
 
 type Node struct {
+	ID            ids.NodeID
 	Net           network.Network
 	ChainsManager chains.Manager
 	Config        *Config
@@ -26,8 +30,11 @@ func (n *Node) Initialize(config *Config) error {
 	fmt.Println("initializing node")
 
 	n.doneShuttingDown.Add(1)
-
 	n.Config = config
+	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+
+	// TODO: init beacons
+
 	if err := n.initNetworking(); err != nil {
 		fmt.Printf("initNetworking err %v\n", err)
 		return err
@@ -79,17 +86,24 @@ func (n *Node) shutdown() {
 }
 
 func (n *Node) initNetworking() error {
-	fmt.Println("initializing networking")
-	listener, err := net.Listen("tcp", ":0") // random port
+	curIPPort := n.Config.IPPort.IPPort()
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", curIPPort.Port))
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("finished init networking, addr: %s\n", listener.Addr().String())
+	fmt.Printf("initializing networking, NodeID: %s\n", curIPPort.String())
 
-	nConfig := &network.Config{}
+	msgCreator, err := message.NewCreator()
+	if err != nil {
+		return err
+	}
 
-	n.Net, err = network.New(nConfig, listener)
+	n.Config.NetworkConfig.TLSConfig = peer.TLSConfig(n.Config.StakingTLSCert)
+	n.Config.NetworkConfig.MyNodeID = n.ID
+	n.Config.NetworkConfig.IPPort = n.Config.IPPort
+
+	n.Net, err = network.New(&n.Config.NetworkConfig, msgCreator, listener)
 	if err != nil {
 		fmt.Printf("init network failed %v\n", err)
 		return err

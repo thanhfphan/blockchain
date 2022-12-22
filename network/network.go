@@ -44,16 +44,14 @@ type network struct {
 	onCloseCtxCancel func()
 }
 
-func New(config *Config, listener net.Listener) (Network, error) {
-	msgCreator, err := message.NewCreator()
-	if err != nil {
-		return nil, err
-	}
+func New(config *Config, msgCreator message.Creator, listener net.Listener) (Network, error) {
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	peerConfig := &peer.Config{
 		MessageCreator: msgCreator,
-		PongTimeout:    30 * time.Second,
+		PongTimeout:    config.PongTimeout,
+
+		//Beacons //TODO
 	}
 
 	n := &network{
@@ -101,6 +99,8 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	n.connectingPeers.Remove(nodeID)
 	n.connectedPeers.Add(peer)
 	n.peersLock.Unlock()
+
+	//TODO: send message to others
 }
 
 func (n *network) Disconnected(nodeID ids.NodeID) {
@@ -175,6 +175,9 @@ func (n *network) Dispatch() error {
 			}
 		}()
 	}
+
+	n.StartClose()
+	//TODO: wait peer close
 
 	return nil
 }
