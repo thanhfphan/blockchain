@@ -17,11 +17,7 @@ func (id NodeID) Bytes() []byte {
 }
 
 func (id NodeID) String() string {
-	return NodeID(id).PrefixedString(NodeIDPrefix)
-}
-
-func (id NodeID) PrefixedString(prefix string) string {
-	return prefix + id.String()
+	return ID(id).PrefixedString(NodeIDPrefix)
 }
 
 func ToNodeID(bytes []byte) (NodeID, error) {

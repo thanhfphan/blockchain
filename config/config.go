@@ -16,7 +16,6 @@ func GetNodeConfig() (node.Config, error) {
 	cfg := node.Config{}
 
 	var err error
-	// cfg.CertConfig = nil
 
 	cfg.IPConfig, err = getIPConfig()
 	if err != nil {

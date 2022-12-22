@@ -47,3 +47,7 @@ func (id ID) String() string {
 	str, _ := base58.Encode(id.Bytes())
 	return str
 }
+
+func (id ID) PrefixedString(prefix string) string {
+	return prefix + id.String()
+}

@@ -27,11 +27,11 @@ type Node struct {
 }
 
 func (n *Node) Initialize(config *Config) error {
-	fmt.Println("initializing node")
-
 	n.doneShuttingDown.Add(1)
 	n.Config = config
 	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+
+	fmt.Printf("initializing node=%s\n", n.ID.String())
 
 	// TODO: init beacons
 
@@ -92,7 +92,7 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
-	fmt.Printf("initializing networking, NodeID: %s\n", curIPPort.String())
+	fmt.Printf("initializing networking at: %s\n", curIPPort.String())
 
 	msgCreator, err := message.NewCreator()
 	if err != nil {
