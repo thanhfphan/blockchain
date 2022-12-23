@@ -112,7 +112,7 @@ func (p *peer) writeMessages() {
 	writer := bufio.NewWriter(p.conn)
 
 	for {
-		msg, ok := p.messageQueue.Pop()
+		msg, ok := p.messageQueue.PopNow()
 		if ok {
 			p.writeMessage(writer, msg)
 			continue

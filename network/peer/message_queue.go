@@ -12,6 +12,8 @@ type MessageQueue interface {
 	Push(ctx context.Context, msg message.OutboundMessage) bool
 	// Pop block until a message is available and then returns the message
 	Pop() (message.OutboundMessage, bool)
+	// PopNow will return is there is no messages in queue
+	PopNow() (message.OutboundMessage, bool)
 	Close()
 }
 
@@ -57,11 +59,22 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	}
 }
 
+// Pop will wait if there is no messages in queue
 func (q *blockingMessageQueue) Pop() (message.OutboundMessage, bool) {
 	select {
 	case msg := <-q.queue:
-		return msg, false
+		return msg, true
 	case <-q.closing:
+		return nil, false
+	}
+}
+
+// PopNow will return if there no messaages in queue
+func (q *blockingMessageQueue) PopNow() (message.OutboundMessage, bool) {
+	select {
+	case msg := <-q.queue:
+		return msg, true
+	default:
 		return nil, false
 	}
 }

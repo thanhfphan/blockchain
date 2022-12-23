@@ -40,7 +40,6 @@ func (s *set) Add(peer Peer) {
 		s.peersSlice[index] = peer
 	}
 }
-
 func (s *set) GetByID(nodeID ids.NodeID) (Peer, bool) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
