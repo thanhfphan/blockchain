@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/thanhfphan/blockchain/network"
+	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/node"
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/staking"
@@ -79,7 +80,11 @@ func getBootstrapConfig() (node.BootstrapConfig, error) {
 func getNetworkConfig() (network.Config, error) {
 	config := network.Config{
 		TimeoutConfig: network.TimeoutConfig{
-			PongTimeout: 30 * time.Second,
+			PongTimeout:   30 * time.Second,
+			PingFrequency: 10 * time.Second,
+		},
+		DialerConfig: dialer.Config{
+			ConnectionTimeout: 10 * time.Second,
 		},
 	}
 

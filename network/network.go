@@ -9,8 +9,10 @@ import (
 
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/message"
+	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
+	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
 var _ Network = (*network)(nil)
@@ -26,6 +28,7 @@ type Network interface {
 	// Should only be called once, run until error occur or network closed
 	Dispatch() error
 	StartClose()
+	ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort)
 }
 
 type network struct {
@@ -35,6 +38,7 @@ type network struct {
 	connectingPeers peer.Set
 	connectedPeers  peer.Set
 	listener        net.Listener
+	dialer          dialer.Dialer
 
 	serverUpgrader peer.Upgrader
 	clientUpgrader peer.Upgrader
@@ -44,12 +48,13 @@ type network struct {
 	onCloseCtxCancel func()
 }
 
-func New(config *Config, msgCreator message.Creator, listener net.Listener) (Network, error) {
+func New(config *Config, msgCreator message.Creator, listener net.Listener, dialer dialer.Dialer) (Network, error) {
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	peerConfig := &peer.Config{
 		MessageCreator: msgCreator,
 		PongTimeout:    config.PongTimeout,
+		PingFrequency:  config.PingFrequency,
 
 		//Beacons //TODO
 	}
@@ -60,6 +65,7 @@ func New(config *Config, msgCreator message.Creator, listener net.Listener) (Net
 		listener:        listener,
 		connectingPeers: peer.NewSet(),
 		connectedPeers:  peer.NewSet(),
+		dialer:          dialer,
 
 		onCloseCtx:       onCloseCtx,
 		onCloseCtxCancel: cancel,
@@ -154,6 +160,18 @@ func (n *network) StartClose() {
 	})
 }
 
+func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	if _, isConnected := n.connectedPeers.GetByID(nodeID); isConnected {
+		fmt.Printf("%s already connected\n", nodeID)
+		return
+	}
+
+	n.dial(n.onCloseCtx, nodeID, ip)
+}
+
 // Dispatch start to accepting connections from other nodes to connect to this node
 func (n *network) Dispatch() error {
 
@@ -246,6 +264,24 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) []ids.Nod
 	}
 
 	return sendTo
+}
+
+func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip ips.IPPort) {
+	go func() {
+		conn, err := n.dialer.Dial(ctx, ip)
+		if err != nil {
+			fmt.Printf("dial to IP: %s failed %v", ip.IP.String(), err)
+			return
+		}
+
+		err = n.upgrade(conn, n.clientUpgrader)
+		if err != nil {
+			fmt.Printf("upgrade failed %v", err)
+			return
+		}
+
+		return
+	}()
 }
 
 func (n *network) samplePeers(numberPeersToSample int) []peer.Peer {

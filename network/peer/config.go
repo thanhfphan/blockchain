@@ -10,4 +10,5 @@ type Config struct {
 	Network        Network
 	MessageCreator message.Creator
 	PongTimeout    time.Duration
+	PingFrequency  time.Duration
 }

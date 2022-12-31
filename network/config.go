@@ -5,16 +5,20 @@ import (
 	"time"
 
 	"github.com/thanhfphan/blockchain/ids"
+	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
 type Config struct {
-	TLSConfig *tls.Config
-	MyNodeID  ids.NodeID
-	IPPort    ips.DynamicIPPort
+	TLSConfig    *tls.Config
+	MyNodeID     ids.NodeID
+	IPPort       ips.DynamicIPPort
+	DialerConfig dialer.Config
+
 	TimeoutConfig
 }
 
 type TimeoutConfig struct {
-	PongTimeout time.Duration
+	PongTimeout   time.Duration
+	PingFrequency time.Duration
 }

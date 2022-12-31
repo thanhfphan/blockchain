@@ -9,8 +9,10 @@ import (
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/network"
+	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/utils"
+	"github.com/thanhfphan/blockchain/utils/constants"
 )
 
 type Node struct {
@@ -103,7 +105,12 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.IPPort = n.Config.IPPort
 
-	n.Net, err = network.New(&n.Config.NetworkConfig, msgCreator, listener)
+	n.Net, err = network.New(
+		&n.Config.NetworkConfig,
+		msgCreator,
+		listener,
+		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig),
+	)
 	if err != nil {
 		fmt.Printf("init network failed %v\n", err)
 		return err

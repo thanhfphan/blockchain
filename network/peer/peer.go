@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/thanhfphan/blockchain/ids"
@@ -33,9 +34,12 @@ type peer struct {
 	cert         *x509.Certificate
 	messageQueue MessageQueue
 
+	numExecuting        int64
 	startClosingOnce    sync.Once
 	onClosingCtx        context.Context
 	conClosingCtxCancel func()
+	// handle err when close
+	onClose chan struct{}
 }
 
 func Start(
@@ -53,10 +57,14 @@ func Start(
 		messageQueue:        msgQueue,
 		onClosingCtx:        onClosingCtx,
 		conClosingCtxCancel: onClosingCtxCancel,
+		// onClose:             make(chan struct{}),
+		numExecuting: 3,
 	}
 
+	// number goroutine = numExecuting
 	go p.readMessages()
 	go p.writeMessages()
+	go p.sendNetworkMessages()
 
 	return p
 }
@@ -106,6 +114,17 @@ func (p *peer) readMessages() {
 
 func (p *peer) handle(msg message.InboundMessage) {
 	fmt.Printf("handle msg=%s\n", msg)
+	switch msg.Op() {
+	case message.PingOp:
+		p.handlePing(msg)
+		return
+	case message.PongOp:
+		p.handlePong(msg)
+		return
+	}
+
+	// TODO: handle in consensus level
+	fmt.Printf("receive unknown message %v\n", msg)
 }
 
 func (p *peer) writeMessages() {
@@ -132,6 +151,20 @@ func (p *peer) writeMessages() {
 	}
 }
 
+func (p *peer) handlePing(m message.InboundMessage) {
+
+	msg, err := p.MessageCreator.Pong()
+	if err != nil {
+		fmt.Printf("create pong message failed %v\n", err)
+		return
+	}
+	p.Send(p.onClosingCtx, msg)
+}
+
+func (p *peer) handlePong(msg message.InboundMessage) {
+	fmt.Println("receive pong message")
+}
+
 func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 
@@ -142,5 +175,37 @@ func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
 	if _, err := io.Copy(writer, bytes.NewReader(msgBytes)); err != nil {
 		fmt.Printf("error writing message %v\n", err)
 		return
+	}
+}
+
+func (p *peer) close() {
+	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
+		return
+	}
+
+	p.Network.Disconnected(p.id)
+	// close(p.onClose)
+}
+
+func (p *peer) sendNetworkMessages() {
+	sendPingsTicker := time.NewTicker(p.PingFrequency)
+	defer func() {
+		sendPingsTicker.Stop()
+		p.StartClose()
+		p.close()
+	}()
+
+	for {
+		select {
+		case <-sendPingsTicker.C:
+			pingMessage, err := p.Config.MessageCreator.Ping()
+			if err != nil {
+				fmt.Printf("create PING message failed %v\n", err)
+				return
+			}
+			p.Send(p.onClosingCtx, pingMessage)
+		case <-p.onClosingCtx.Done():
+			return
+		}
 	}
 }
