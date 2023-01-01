@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/thanhfphan/blockchain/network"
 	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/node"
@@ -13,12 +14,12 @@ import (
 	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
-func GetNodeConfig() (node.Config, error) {
+func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	cfg := node.Config{}
 
 	var err error
 
-	cfg.IPConfig, err = getIPConfig()
+	cfg.IPConfig, err = getIPConfig(v)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("get ipConfig err=%v", err)
 	}
@@ -33,7 +34,7 @@ func GetNodeConfig() (node.Config, error) {
 		return node.Config{}, fmt.Errorf("get boostrapConfig err=%v", err)
 	}
 
-	cfg.NetworkConfig, err = getNetworkConfig()
+	cfg.NetworkConfig, err = getNetworkConfig(v)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("get networkConfig err=%v", err)
 	}
@@ -42,12 +43,11 @@ func GetNodeConfig() (node.Config, error) {
 	return cfg, nil
 }
 
-func getIPConfig() (node.IPConfig, error) {
+func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
-	//TODO: get ip from user or use public ip
-	ip := net.ParseIP("127.0.0.1")
-	//FIXME: get from user
-	port := 4001
+	publicIP := v.GetString(PublicIPKey)
+	ip := net.ParseIP(publicIP)
+	port := v.GetUint(StakingPortKey)
 
 	return node.IPConfig{
 		// use dynamic cause the machine's IP might change
@@ -77,11 +77,14 @@ func getBootstrapConfig() (node.BootstrapConfig, error) {
 	return config, nil
 }
 
-func getNetworkConfig() (network.Config, error) {
+func getNetworkConfig(v *viper.Viper) (network.Config, error) {
+	pingFrequency := v.GetDuration(NetworkPingFrequencyKey)
+	pingTimeout := v.GetDuration(NetworkPingTimeoutKey)
+
 	config := network.Config{
 		TimeoutConfig: network.TimeoutConfig{
-			PongTimeout:   30 * time.Second,
-			PingFrequency: 10 * time.Second,
+			PongTimeout:   pingTimeout,
+			PingFrequency: pingFrequency,
 		},
 		DialerConfig: dialer.Config{
 			ConnectionTimeout: 10 * time.Second,
