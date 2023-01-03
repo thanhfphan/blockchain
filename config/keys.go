@@ -4,7 +4,10 @@ const (
 	// network
 	NetworkPingFrequencyKey = "network-ping-frequency"
 	NetworkPingTimeoutKey   = "network-ping-timeout"
+	NetworkDialerTimeoutKey = "network-dialer-timeout"
 
-	StakingPortKey = "port"
-	PublicIPKey    = "ip"
+	PublicIPKey           = "ip"
+	StakingPortKey        = "port"
+	StakingTLSKeyPathKey  = "tls-key-path"
+	StakingTLSCertPathKey = "tls-cert-path"
 )

@@ -74,3 +74,17 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 
 	return certBuff.Bytes(), keyBuff.Bytes(), nil
 }
+
+func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &cert, nil
+}

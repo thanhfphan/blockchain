@@ -1,9 +1,9 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/spf13/viper"
 	"github.com/thanhfphan/blockchain/network"
@@ -24,7 +24,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("get ipConfig err=%v", err)
 	}
 
-	cfg.StakingConfig, err = getCertConfig()
+	cfg.StakingConfig, err = getCertConfig(v)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("get certConfig err=%v", err)
 	}
@@ -56,15 +56,22 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	}, nil
 }
 
-func getCertConfig() (node.StakingConfig, error) {
+func getTLSCert(v *viper.Viper) (tls.Certificate, error) {
+	cert, err := staking.NewTLSCert()
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	return *cert, nil
+}
+
+func getCertConfig(v *viper.Viper) (node.StakingConfig, error) {
 	cfg := node.StakingConfig{}
 
-	cert, err := staking.NewTLSCert()
+	cert, err := getTLSCert(v)
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
-
-	cfg.StakingTLSCert = *cert
+	cfg.StakingTLSCert = cert
 
 	return cfg, nil
 }
@@ -80,14 +87,14 @@ func getBootstrapConfig() (node.BootstrapConfig, error) {
 func getNetworkConfig(v *viper.Viper) (network.Config, error) {
 	pingFrequency := v.GetDuration(NetworkPingFrequencyKey)
 	pingTimeout := v.GetDuration(NetworkPingTimeoutKey)
-
+	dialerTimeout := v.GetDuration(NetworkDialerTimeoutKey)
 	config := network.Config{
 		TimeoutConfig: network.TimeoutConfig{
 			PongTimeout:   pingTimeout,
 			PingFrequency: pingFrequency,
 		},
 		DialerConfig: dialer.Config{
-			ConnectionTimeout: 10 * time.Second,
+			ConnectionTimeout: dialerTimeout,
 		},
 	}
 

@@ -9,7 +9,11 @@ import (
 
 const (
 	DefaultStakingPort     = 4012
-	DefaultStakingIPAdress = "127.0.1"
+	DefaultStakingIPAdress = "127.0.0.1"
+
+	DefaultPingFrequency = 30 * time.Second
+	DefaultPingTimeout   = 10 * time.Second
+	DefaultDialerTimeout = 10 * time.Second
 )
 
 func BuildFlagSet() *flag.FlagSet {
@@ -20,9 +24,12 @@ func BuildFlagSet() *flag.FlagSet {
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
-	fs.Duration(NetworkPingFrequencyKey, 30*time.Second, "Frequency of pinging other peers")
-	fs.Duration(NetworkPingTimeoutKey, 10*time.Second, "Timeout value for Ping-Pong with a peer")
+	fs.Duration(NetworkPingFrequencyKey, DefaultPingFrequency, "Frequency of pinging other peers")
+	fs.Duration(NetworkPingTimeoutKey, DefaultPingTimeout, "Timeout value for Ping-Pong with a peer")
+	fs.Duration(NetworkDialerTimeoutKey, DefaultDialerTimeout, "Timeout value for dial with other peers")
 
-	fs.String(PublicIPKey, DefaultStakingIPAdress, "IP of this node for P2P communication")
+	// fs.String(PublicIPKey, DefaultStakingIPAdress, "IP of this node for P2P communication") //only support local for now
 	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
+	// fs.String(StakingTLSKeyPathKey, "", "Path to the TLS private key. If not specified, create a random one")
+	// fs.String(StakingTLSCertPathKey, "", "Path to the TLS certificate key. If not specified, create a random one")
 }
