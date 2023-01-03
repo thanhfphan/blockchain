@@ -89,7 +89,7 @@ func (q *blockingMessageQueue) Close() {
 		for {
 			select {
 			case msg := <-q.queue:
-				fmt.Printf("dropping message when closing MessageQueue %v\n", msg)
+				fmt.Printf("dropping message when closing MessageQueue OP %v\n", msg.Op())
 			default:
 				return
 			}

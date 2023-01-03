@@ -6,12 +6,15 @@ import (
 	"net"
 
 	"github.com/spf13/viper"
+	"github.com/thanhfphan/blockchain/genesis"
+	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/network"
 	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/node"
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/staking"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/units"
 )
 
 func GetNodeConfig(v *viper.Viper) (node.Config, error) {
@@ -79,7 +82,20 @@ func getCertConfig(v *viper.Viper) (node.StakingConfig, error) {
 func getBootstrapConfig() (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{}
 
-	//TODO: hardcode some node here, assume those nodes were started
+	genesisNodes := genesis.GetGenesisNodes()
+	for _, item := range genesisNodes {
+		addr, err := ips.ToIPPort(item.IP)
+		if err != nil {
+			return node.BootstrapConfig{}, err
+		}
+		config.BootstrapIPs = append(config.BootstrapIPs, addr)
+
+		nodeID, err := ids.NodeIDFromString(item.NodeID)
+		if err != nil {
+			return node.BootstrapConfig{}, err
+		}
+		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
+	}
 
 	return config, nil
 }
@@ -96,6 +112,8 @@ func getNetworkConfig(v *viper.Viper) (network.Config, error) {
 		DialerConfig: dialer.Config{
 			ConnectionTimeout: dialerTimeout,
 		},
+		PeerReadBufferSize:  8 * units.KiB,
+		PeerWriteBufferSize: 8 * units.KiB,
 	}
 
 	return config, nil

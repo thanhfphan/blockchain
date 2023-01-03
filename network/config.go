@@ -10,10 +10,12 @@ import (
 )
 
 type Config struct {
-	TLSConfig    *tls.Config
-	MyNodeID     ids.NodeID
-	IPPort       ips.DynamicIPPort
-	DialerConfig dialer.Config
+	TLSConfig           *tls.Config
+	MyNodeID            ids.NodeID
+	IPPort              ips.DynamicIPPort
+	DialerConfig        dialer.Config
+	PeerReadBufferSize  int
+	PeerWriteBufferSize int
 
 	TimeoutConfig
 }

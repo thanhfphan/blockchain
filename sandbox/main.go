@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/thanhfphan/blockchain/config"
+	"github.com/thanhfphan/blockchain/genesis"
 	"github.com/thanhfphan/blockchain/network"
 	"github.com/thanhfphan/blockchain/network/dialer"
 	"github.com/thanhfphan/blockchain/node"
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/staking"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/units"
 )
 
 func main() {
@@ -48,8 +49,12 @@ func waitToSignal() {
 
 func buildConfig() *node.Config {
 	cfg := &node.Config{}
+	ipPort, err := ips.ToIPPort(genesis.GetGenesisNodes()[0].IP)
+	if err != nil {
+		panic(err)
+	}
 	cfg.IPConfig = node.IPConfig{
-		IPPort: ips.NewDynamicIPPort(net.ParseIP("127.0.0.1"), uint16(4444)),
+		IPPort: ips.NewDynamicIPPort(ipPort.IP, ipPort.Port),
 	}
 
 	cert, err := staking.LoadTLSCertFromFiles("./nodes/key1.key", "./nodes/cert1.crt")
@@ -66,6 +71,8 @@ func buildConfig() *node.Config {
 		DialerConfig: dialer.Config{
 			ConnectionTimeout: config.DefaultDialerTimeout,
 		},
+		PeerReadBufferSize:  8 * units.KiB,
+		PeerWriteBufferSize: 8 * units.KiB,
 	}
 
 	cfg.ConsensusRouter = &router.ChainRouter{}

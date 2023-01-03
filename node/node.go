@@ -60,6 +60,10 @@ func (n *Node) ExitCode() int {
 
 func (n *Node) Dispatch() error {
 
+	for i, peerIP := range n.Config.BootstrapIPs {
+		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
+	}
+
 	n.Net.Dispatch()
 	n.Shutdown(1)
 

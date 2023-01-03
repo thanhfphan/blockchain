@@ -32,7 +32,7 @@ func NewDialer(network string, cfg Config) Dialer {
 }
 
 func (d *dialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
-	fmt.Printf("dialing to ip: %s", ip.IP.String())
+	fmt.Printf("dialing to ip: %s\n", ip.String())
 
 	conn, err := d.dialer.DialContext(ctx, d.network, ip.String())
 	if err != nil {

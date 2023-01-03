@@ -28,6 +28,6 @@ type StakingConfig struct {
 }
 
 type BootstrapConfig struct {
-	BoostrapIDs []ids.NodeID
-	BoostrapIPs []ips.IPPort
+	BootstrapIDs []ids.NodeID
+	BootstrapIPs []ips.IPPort
 }

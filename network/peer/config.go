@@ -7,8 +7,10 @@ import (
 )
 
 type Config struct {
-	Network        Network
-	MessageCreator message.Creator
-	PongTimeout    time.Duration
-	PingFrequency  time.Duration
+	Network         Network
+	MessageCreator  message.Creator
+	PongTimeout     time.Duration
+	PingFrequency   time.Duration
+	ReadBufferSize  int
+	WriteBufferSize int
 }

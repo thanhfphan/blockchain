@@ -52,9 +52,11 @@ func New(config *Config, msgCreator message.Creator, listener net.Listener, dial
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	peerConfig := &peer.Config{
-		MessageCreator: msgCreator,
-		PongTimeout:    config.PongTimeout,
-		PingFrequency:  config.PingFrequency,
+		MessageCreator:  msgCreator,
+		PongTimeout:     config.PongTimeout,
+		PingFrequency:   config.PingFrequency,
+		ReadBufferSize:  config.PeerReadBufferSize,
+		WriteBufferSize: config.PeerWriteBufferSize,
 
 		//Beacons //TODO
 	}
@@ -201,6 +203,8 @@ func (n *network) Dispatch() error {
 }
 
 func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
+	// TODO: set timeout Upgrade
+
 	nodeID, tlsConn, cert, err := upgrader.Upgrader(conn)
 	if err != nil {
 		_ = conn.Close()
@@ -233,7 +237,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		return nil
 	}
 
-	peer := peer.Start(n.peerConfig, conn, cert, nodeID, peer.NewBlockingQueue(maxMessageInQueue))
+	peer := peer.Start(n.peerConfig, tlsConn, cert, nodeID, peer.NewBlockingQueue(maxMessageInQueue))
 	n.connectingPeers.Add(peer)
 	return nil
 }

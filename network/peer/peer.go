@@ -2,7 +2,6 @@ package peer
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/x509"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/message"
+	"github.com/thanhfphan/blockchain/utils/constants"
+	"github.com/thanhfphan/blockchain/utils/wrappers"
 )
 
 var (
@@ -89,16 +90,35 @@ func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 }
 
 func (p *peer) readMessages() {
-	reader := bufio.NewReader(p.conn)
-
+	reader := bufio.NewReaderSize(p.conn, p.Config.ReadBufferSize)
+	msgLenBytes := make([]byte, wrappers.IntLen)
 	for {
-		msgBytes, err := io.ReadAll(reader)
+		// TODO: implement ping-pong
+		// if err := p.conn.SetReadDeadline(time.Now().Add(p.PongTimeout)); err != nil {
+		// 	fmt.Println("error setting the connection read timeout - readMessages")
+		// 	return
+		// }
+
+		// read message length
+		if _, err := io.ReadFull(reader, msgLenBytes); err != nil {
+			fmt.Printf("reading message length in nodeId=%s failed %v\n", p.id.String(), err)
+			return
+		}
+
+		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
-			fmt.Printf("reading message in nodeId=%d failed %v\n", p.id, err)
+			fmt.Println("parse message length failed - readMsgLen")
 			return
 		}
 
 		if err := p.onClosingCtx.Err(); err != nil {
+			return
+		}
+
+		msgBytes := make([]byte, msgLen)
+		// read the message
+		if _, err := io.ReadFull(reader, msgBytes); err != nil {
+			fmt.Printf("reading message in nodeId=%d failed %v\n", p.id, err)
 			return
 		}
 
@@ -112,23 +132,16 @@ func (p *peer) readMessages() {
 	}
 }
 
-func (p *peer) handle(msg message.InboundMessage) {
-	fmt.Printf("handle msg=%s\n", msg)
-	switch msg.Op() {
-	case message.PingOp:
-		p.handlePing(msg)
-		return
-	case message.PongOp:
-		p.handlePong(msg)
+func (p *peer) writeMessages() {
+	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
+
+	msg, err := p.MessageCreator.Hello()
+	if err != nil {
+		fmt.Printf("create msg hello failed %v\n", err)
 		return
 	}
 
-	// TODO: handle in consensus level
-	fmt.Printf("receive unknown message %v\n", msg)
-}
-
-func (p *peer) writeMessages() {
-	writer := bufio.NewWriter(p.conn)
+	p.writeMessage(writer, msg)
 
 	for {
 		msg, ok := p.messageQueue.PopNow()
@@ -151,6 +164,43 @@ func (p *peer) writeMessages() {
 	}
 }
 
+func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
+	msgBytes := msg.Bytes()
+
+	if err := p.conn.SetWriteDeadline(time.Now().Add(p.PongTimeout)); err != nil {
+		fmt.Printf("set writeDeadLine failed %v\n", err)
+		return
+	}
+
+	msgLen := uint32(len(msgBytes))
+	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
+	if err != nil {
+		fmt.Printf("writeMsgLen got err %v\n", err)
+		return
+	}
+
+	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
+	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
+		fmt.Printf("error writing message %v\n", err)
+		return
+	}
+}
+
+func (p *peer) handle(msg message.InboundMessage) {
+	fmt.Printf("handle msg=%s\n", msg)
+	switch msg.Op() {
+	case message.PingOp:
+		p.handlePing(msg)
+		return
+	case message.PongOp:
+		p.handlePong(msg)
+		return
+	}
+
+	// TODO: handle in consensus level
+	fmt.Printf("receive unknown message %v\n", msg)
+}
+
 func (p *peer) handlePing(m message.InboundMessage) {
 
 	msg, err := p.MessageCreator.Pong()
@@ -163,19 +213,6 @@ func (p *peer) handlePing(m message.InboundMessage) {
 
 func (p *peer) handlePong(msg message.InboundMessage) {
 	fmt.Println("receive pong message")
-}
-
-func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
-	msgBytes := msg.Bytes()
-
-	if err := p.conn.SetWriteDeadline(time.Now().Add(p.PongTimeout)); err != nil {
-		fmt.Printf("set writeDeadLine failed %v\n", err)
-		return
-	}
-	if _, err := io.Copy(writer, bytes.NewReader(msgBytes)); err != nil {
-		fmt.Printf("error writing message %v\n", err)
-		return
-	}
 }
 
 func (p *peer) close() {
