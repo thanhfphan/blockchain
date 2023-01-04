@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/labstack/gommon/log"
 	"github.com/thanhfphan/blockchain/app"
 	"github.com/thanhfphan/blockchain/node"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 const (
@@ -36,6 +36,13 @@ func NewApp(config node.Config) app.IApp {
 }
 
 func (p *Process) Start() error {
+	logFactory := logging.NewFactory(p.config.LoggingConfig)
+	log, err := logFactory.Make("main")
+	if err != nil {
+		logFactory.Close()
+		return err
+	}
+
 	if err := p.node.Initialize(&p.config); err != nil {
 		log.Warnf("init node failed %v", err)
 		return err

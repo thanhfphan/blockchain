@@ -14,6 +14,7 @@ import (
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/staking"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/logging"
 	"github.com/thanhfphan/blockchain/utils/units"
 )
 
@@ -41,6 +42,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, fmt.Errorf("get networkConfig err=%v", err)
 	}
+
+	cfg.LoggingConfig = getLoggingConfig(v)
 
 	cfg.ConsensusRouter = &router.ChainRouter{}
 	return cfg, nil
@@ -117,4 +120,12 @@ func getNetworkConfig(v *viper.Viper) (network.Config, error) {
 	}
 
 	return config, nil
+}
+
+func getLoggingConfig(v *viper.Viper) logging.Config {
+	cfg := logging.Config{
+		LogLevel: logging.Verbo,
+	}
+
+	return cfg
 }

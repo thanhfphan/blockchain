@@ -7,6 +7,7 @@ import (
 	"github.com/thanhfphan/blockchain/network"
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 type Config struct {
@@ -15,6 +16,7 @@ type Config struct {
 	StakingConfig
 	BootstrapConfig
 	NetworkConfig network.Config
+	LoggingConfig logging.Config
 }
 
 type IPConfig struct {
