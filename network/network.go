@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 var _ Network = (*network)(nil)
@@ -33,6 +33,7 @@ type Network interface {
 
 type network struct {
 	config          *Config
+	log             logging.Logger
 	peerConfig      *peer.Config
 	peersLock       sync.RWMutex
 	connectingPeers peer.Set
@@ -48,7 +49,13 @@ type network struct {
 	onCloseCtxCancel func()
 }
 
-func New(config *Config, msgCreator message.Creator, listener net.Listener, dialer dialer.Dialer) (Network, error) {
+func New(
+	config *Config,
+	log logging.Logger,
+	msgCreator message.Creator,
+	listener net.Listener,
+	dialer dialer.Dialer,
+) (Network, error) {
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	peerConfig := &peer.Config{
@@ -62,6 +69,7 @@ func New(config *Config, msgCreator message.Creator, listener net.Listener, dial
 	}
 
 	n := &network{
+		log:             log,
 		config:          config,
 		peerConfig:      peerConfig,
 		listener:        listener,
@@ -132,9 +140,9 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 
 func (n *network) StartClose() {
 	n.closeOnce.Do(func() {
-		fmt.Println("shutting down the p2p networking")
+		n.log.Verbof("Shutting down the p2p networking")
 		if err := n.listener.Close(); err != nil {
-			fmt.Printf("close the network listener err=%v\n", err)
+			n.log.Errorf("Close the network listener err=%v\n", err)
 		}
 
 		n.peersLock.Lock()
@@ -145,7 +153,7 @@ func (n *network) StartClose() {
 		for i := 0; i < n.connectingPeers.Len(); i++ {
 			peer, err := n.connectingPeers.GetByIndex(i)
 			if err != nil {
-				fmt.Printf("get peer by index=%d failed\n", i)
+				n.log.Warnf("Get peer by index=%d failed\n", i)
 			} else {
 				peer.StartClose()
 			}
@@ -154,7 +162,7 @@ func (n *network) StartClose() {
 		for i := 0; i < n.connectedPeers.Len(); i++ {
 			peer, err := n.connectedPeers.GetByIndex(i)
 			if err != nil {
-				fmt.Printf("get peer by index=%d failed\n", i)
+				n.log.Warnf("Get peer by index=%d failed\n", i)
 			} else {
 				peer.StartClose()
 			}
@@ -167,7 +175,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 	defer n.peersLock.Unlock()
 
 	if _, isConnected := n.connectedPeers.GetByID(nodeID); isConnected {
-		fmt.Printf("%s already connected\n", nodeID)
+		n.log.Warnf("%s already connected\n", nodeID)
 		return
 	}
 
@@ -184,14 +192,14 @@ func (n *network) Dispatch() error {
 
 		conn, err := n.listener.Accept()
 		if err != nil {
-			fmt.Printf("listen connection err=%v\n", err)
+			n.log.Debugf("Listen tcp connection has error=%v\n", err)
 			time.Sleep(time.Millisecond)
 			continue
 		}
 
 		go func() {
 			if err := n.upgrade(conn, n.serverUpgrader); err != nil {
-				fmt.Printf("perr upgrade err=%v\n", err)
+				n.log.Errorf("Upgrade peer has error=%v\n", err)
 			}
 		}()
 	}
@@ -208,19 +216,19 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	nodeID, tlsConn, cert, err := upgrader.Upgrader(conn)
 	if err != nil {
 		_ = conn.Close()
-		fmt.Printf("upgrade connection failed %v\n", err)
+		n.log.Errorf("Upgrade connection failed %v\n", err)
 		return err
 	}
 
 	if err := tlsConn.SetReadDeadline(time.Time{}); err != nil {
 		_ = tlsConn.Close()
-		fmt.Printf("set readDeadLine failed %v\n", err)
+		n.log.Errorf("Set readDeadLine failed %v\n", err)
 		return err
 	}
 
 	if nodeID == n.config.MyNodeID {
 		_ = tlsConn.Close()
-		fmt.Printf("dropping connection to myslef\n")
+		n.log.Verbof("Dropping connection to myslef\n")
 		return nil
 	}
 
@@ -228,16 +236,17 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	defer n.peersLock.Unlock()
 
 	if _, isConnecting := n.connectingPeers.GetByID(nodeID); isConnecting {
-		fmt.Printf("dropping connection because already connecting to peer=%s", nodeID.String())
+		n.log.Warnf("Dropping connection because already connecting to peer=%s", nodeID.String())
 		return nil
 	}
 
 	if _, isConnected := n.connectedPeers.GetByID(nodeID); isConnected {
-		fmt.Printf("dropping connection because already connected to peer=%s", nodeID.String())
+		n.log.Warnf("Dropping connection because already connected to peer=%s", nodeID.String())
 		return nil
 	}
 
-	peer := peer.Start(n.peerConfig, tlsConn, cert, nodeID, peer.NewBlockingQueue(maxMessageInQueue))
+	msgQueue := peer.NewBlockingQueue(maxMessageInQueue, n.log)
+	peer := peer.Start(n.peerConfig, n.log, tlsConn, cert, nodeID, msgQueue)
 	n.connectingPeers.Add(peer)
 	return nil
 }
@@ -274,13 +283,13 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip ips.IPPort) {
 	go func() {
 		conn, err := n.dialer.Dial(ctx, ip)
 		if err != nil {
-			fmt.Printf("dial to IP: %s failed %v", ip.IP.String(), err)
+			n.log.Errorf("Dial to IP: %s failed %v\n", ip.IP.String(), err)
 			return
 		}
 
 		err = n.upgrade(conn, n.clientUpgrader)
 		if err != nil {
-			fmt.Printf("upgrade failed %v", err)
+			n.log.Errorf("Upgrade peer failed %v", err)
 			return
 		}
 

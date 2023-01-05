@@ -13,6 +13,7 @@ import (
 	"github.com/thanhfphan/blockchain/network/peer"
 	"github.com/thanhfphan/blockchain/utils"
 	"github.com/thanhfphan/blockchain/utils/constants"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 type Node struct {
@@ -20,6 +21,7 @@ type Node struct {
 	Net           network.Network
 	ChainsManager chains.Manager
 	Config        *Config
+	log           logging.Logger
 
 	shuttingDown         utils.AtomicBool
 	shuttingDownExitCode utils.AtomicInterface
@@ -28,21 +30,22 @@ type Node struct {
 	doneShuttingDown sync.WaitGroup
 }
 
-func (n *Node) Initialize(config *Config) error {
+func (n *Node) Initialize(config *Config, log logging.Logger) error {
 	n.doneShuttingDown.Add(1)
 	n.Config = config
+	n.log = log
 	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
 
-	fmt.Printf("initializing node=%s\n", n.ID.String())
+	n.log.Infof("Starting %s\n", n.ID.String())
 
 	// TODO: init beacons
 
 	if err := n.initNetworking(); err != nil {
-		fmt.Printf("initNetworking err %v\n", err)
+		n.log.Errorf("Initialize networking error=%v\n", err)
 		return err
 	}
 	if err := n.initChainManager(); err != nil {
-		fmt.Printf("init chain manager err %v\n", err)
+		n.log.Errorf("Initialize chain manager error=%v\n", err)
 		return err
 	}
 
@@ -82,13 +85,13 @@ func (n *Node) Shutdown(exitCode int) {
 }
 
 func (n *Node) shutdown() {
-	fmt.Println("shutting down node")
+	n.log.Infof("Shutting down %s", n.ID.String())
 
 	n.Net.StartClose()
 
 	n.doneShuttingDown.Done()
 
-	fmt.Println("finished shutdown")
+	n.log.Infof("Finished shutdown %s", n.ID.String())
 }
 
 func (n *Node) initNetworking() error {
@@ -98,7 +101,7 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
-	fmt.Printf("initializing networking at: %s\n", curIPPort.String())
+	n.log.Infof("Initializing networking at: %s\n", curIPPort.String())
 
 	msgCreator, err := message.NewCreator()
 	if err != nil {
@@ -111,12 +114,13 @@ func (n *Node) initNetworking() error {
 
 	n.Net, err = network.New(
 		&n.Config.NetworkConfig,
+		n.log,
 		msgCreator,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig),
 	)
 	if err != nil {
-		fmt.Printf("init network failed %v\n", err)
+		n.log.Errorf("Initialize networking error=%v\n", err)
 		return err
 	}
 
@@ -124,7 +128,7 @@ func (n *Node) initNetworking() error {
 }
 
 func (n *Node) initChainManager() error {
-	fmt.Println("initializing chain manager")
+	n.log.Infof("Initializing chain manager")
 	err := n.Config.ConsensusRouter.Initialize()
 	if err != nil {
 		return err
@@ -137,7 +141,7 @@ func (n *Node) initChainManager() error {
 }
 
 func (n *Node) initChains() {
-	fmt.Println("init chains")
+	n.log.Infof("Initializing chains")
 	n.ChainsManager.StartChainCreator(&chains.Chainparameters{
 		ID:          100,
 		GenesisData: []byte("genesis data"),

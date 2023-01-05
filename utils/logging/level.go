@@ -1,6 +1,8 @@
 package logging
 
 import (
+	"strings"
+
 	"go.uber.org/zap/zapcore"
 )
 
@@ -15,25 +17,55 @@ const (
 	Error
 	Fatal
 	Off
+
+	FatalStr = "FATAL"
+	ErrorStr = "ERROR"
+	WarnStr  = "WARN"
+	InfoStr  = "INFO"
+	DebugStr = "DEBUG"
+	VerboStr = "VERBO"
+	OffStr   = "OFF"
 )
 
 func (l Level) String() string {
 	switch l {
 	case Fatal:
-		return "FATAL"
+		return FatalStr
 	case Error:
-		return "ERROR"
+		return ErrorStr
 	case Warn:
-		return "WARN"
+		return WarnStr
 	case Info:
-		return "INFO"
+		return InfoStr
 	case Debug:
-		return "DEBUG"
+		return DebugStr
 	case Verbo:
-		return "VERBO"
+		return VerboStr
 	case Off:
-		return "OFF"
+		return OffStr
 	default:
 		return "UNKNOWN"
+	}
+}
+
+func ToLevel(str string) Level {
+	levelStr := strings.ToUpper(str)
+	switch levelStr {
+	case FatalStr:
+		return Fatal
+	case ErrorStr:
+		return Error
+	case WarnStr:
+		return Warn
+	case InfoStr:
+		return Info
+	case DebugStr:
+		return Debug
+	case VerboStr:
+		return Verbo
+	case OffStr:
+		return Off
+	default:
+		return Off
 	}
 }

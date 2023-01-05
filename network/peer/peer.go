@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/utils/constants"
+	"github.com/thanhfphan/blockchain/utils/logging"
 	"github.com/thanhfphan/blockchain/utils/wrappers"
 )
 
@@ -30,6 +30,7 @@ type Peer interface {
 
 type peer struct {
 	*Config
+	log          logging.Logger
 	id           ids.NodeID
 	conn         net.Conn
 	cert         *x509.Certificate
@@ -45,6 +46,7 @@ type peer struct {
 
 func Start(
 	config *Config,
+	log logging.Logger,
 	conn net.Conn,
 	cert *x509.Certificate,
 	nodeID ids.NodeID,
@@ -52,6 +54,7 @@ func Start(
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
 		Config:              config,
+		log:                 log,
 		id:                  nodeID,
 		conn:                conn,
 		cert:                cert,
@@ -77,7 +80,7 @@ func (p *peer) ID() ids.NodeID {
 func (p *peer) StartClose() {
 	p.startClosingOnce.Do(func() {
 		if err := p.conn.Close(); err != nil {
-			fmt.Printf("failed to close connection node=%s", p.ID().String())
+			p.log.Errorf("Failed to close connection node=%s", p.ID().String())
 		}
 
 		p.messageQueue.Close()
@@ -101,13 +104,13 @@ func (p *peer) readMessages() {
 
 		// read message length
 		if _, err := io.ReadFull(reader, msgLenBytes); err != nil {
-			fmt.Printf("reading message length in nodeId=%s failed %v\n", p.id.String(), err)
+			p.log.Errorf("Reading message length in nodeId=%s failed %v\n", p.id.String(), err)
 			return
 		}
 
 		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
-			fmt.Println("parse message length failed - readMsgLen")
+			p.log.Errorf("Parse message length failed - readMsgLen")
 			return
 		}
 
@@ -118,13 +121,13 @@ func (p *peer) readMessages() {
 		msgBytes := make([]byte, msgLen)
 		// read the message
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
-			fmt.Printf("reading message in nodeId=%d failed %v\n", p.id, err)
+			p.log.Errorf("Reading message in nodeId=%d failed %v\n", p.id, err)
 			return
 		}
 
 		msg, err := p.MessageCreator.Parse(msgBytes, p.id)
 		if err != nil {
-			fmt.Printf("failed to parse message %v, err=%v", string(msgBytes), err)
+			p.log.Errorf("Failed to parse message %v, err=%v", string(msgBytes), err)
 			continue
 		}
 
@@ -137,7 +140,7 @@ func (p *peer) writeMessages() {
 
 	msg, err := p.MessageCreator.Hello()
 	if err != nil {
-		fmt.Printf("create msg hello failed %v\n", err)
+		p.log.Errorf("Create msg hello failed %v\n", err)
 		return
 	}
 
@@ -151,7 +154,7 @@ func (p *peer) writeMessages() {
 		}
 
 		if err := writer.Flush(); err != nil {
-			fmt.Printf("failed to flush writer %v\n", err)
+			p.log.Errorf("Failed to flush writer %v\n", err)
 			return
 		}
 
@@ -168,26 +171,26 @@ func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 
 	if err := p.conn.SetWriteDeadline(time.Now().Add(p.PongTimeout)); err != nil {
-		fmt.Printf("set writeDeadLine failed %v\n", err)
+		p.log.Errorf("Set writeDeadLine failed %v\n", err)
 		return
 	}
 
 	msgLen := uint32(len(msgBytes))
 	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
 	if err != nil {
-		fmt.Printf("writeMsgLen got err %v\n", err)
+		p.log.Errorf("writeMsgLen got err %v\n", err)
 		return
 	}
 
 	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
 	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
-		fmt.Printf("error writing message %v\n", err)
+		p.log.Errorf("error writing message %v\n", err)
 		return
 	}
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
-	fmt.Printf("handle msg=%s\n", msg)
+	p.log.Infof("handle msg=%s\n", msg)
 	switch msg.Op() {
 	case message.PingOp:
 		p.handlePing(msg)
@@ -198,21 +201,21 @@ func (p *peer) handle(msg message.InboundMessage) {
 	}
 
 	// TODO: handle in consensus level
-	fmt.Printf("receive unknown message %v\n", msg)
+	p.log.Verbof("receive unknown message %v\n", msg)
 }
 
 func (p *peer) handlePing(m message.InboundMessage) {
 
 	msg, err := p.MessageCreator.Pong()
 	if err != nil {
-		fmt.Printf("create pong message failed %v\n", err)
+		p.log.Errorf("Create pong message failed %v\n", err)
 		return
 	}
 	p.Send(p.onClosingCtx, msg)
 }
 
 func (p *peer) handlePong(msg message.InboundMessage) {
-	fmt.Println("receive pong message")
+	p.log.Verbof("receive pong message")
 }
 
 func (p *peer) close() {
@@ -237,7 +240,7 @@ func (p *peer) sendNetworkMessages() {
 		case <-sendPingsTicker.C:
 			pingMessage, err := p.Config.MessageCreator.Ping()
 			if err != nil {
-				fmt.Printf("create PING message failed %v\n", err)
+				p.log.Errorf("Create PING message failed %v\n", err)
 				return
 			}
 			p.Send(p.onClosingCtx, pingMessage)

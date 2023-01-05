@@ -19,7 +19,7 @@ func newMsgCreator(t *testing.T) message.Creator {
 }
 
 func Test_BlockingQueue(t *testing.T) {
-	q := NewBlockingQueue(10)
+	q := NewBlockingQueue(10, nil)
 
 	mc := newMsgCreator(t)
 	msgs := []message.OutboundMessage{}
@@ -53,7 +53,7 @@ func Test_BlockingQueue(t *testing.T) {
 }
 
 func Test_BlockingQueue_CtxCancelledAndQueueIsClosed(t *testing.T) {
-	q := NewBlockingQueue(10)
+	q := NewBlockingQueue(10, nil)
 
 	mc := newMsgCreator(t)
 

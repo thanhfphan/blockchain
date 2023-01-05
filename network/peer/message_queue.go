@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/thanhfphan/blockchain/message"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 type MessageQueue interface {
@@ -23,12 +24,20 @@ type blockingMessageQueue struct {
 	closing   chan struct{}
 
 	queue chan message.OutboundMessage
+	log   logging.Logger
 }
 
-func NewBlockingQueue(bufferSize int) MessageQueue {
+func NewBlockingQueue(bufferSize int, log logging.Logger) MessageQueue {
 	return &blockingMessageQueue{
 		closing: make(chan struct{}),
 		queue:   make(chan message.OutboundMessage, bufferSize),
+		log:     log,
+	}
+}
+
+func (q *blockingMessageQueue) logMessage(msg string) {
+	if q.log != nil {
+		q.log.Verbof(msg)
 	}
 }
 
@@ -39,10 +48,10 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	ctxDone := ctx.Done()
 	select {
 	case <-q.closing:
-		fmt.Printf("dropping message cause channel close\n")
+		q.logMessage("Dropping message cause channel close\n")
 		return false
 	case <-ctxDone:
-		fmt.Printf("dropping message cause cancelled context\n")
+		q.logMessage("Dropping message cause cancelled context\n")
 		return false
 	default:
 	}
@@ -51,10 +60,10 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	case q.queue <- msg:
 		return true
 	case <-ctxDone:
-		fmt.Printf("dropping message cause cancelled context\n")
+		q.logMessage("dropping message cause cancelled context\n")
 		return false
 	case <-q.closing:
-		fmt.Printf("dropping message cause channel close\n")
+		q.logMessage("dropping message cause channel close\n")
 		return false
 	}
 }
@@ -89,7 +98,7 @@ func (q *blockingMessageQueue) Close() {
 		for {
 			select {
 			case msg := <-q.queue:
-				fmt.Printf("dropping message when closing MessageQueue OP %v\n", msg.Op())
+				q.logMessage(fmt.Sprintf("Dropping message when closing MessageQueue OP %v\n", msg.Op()))
 			default:
 				return
 			}

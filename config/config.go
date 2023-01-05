@@ -123,8 +123,10 @@ func getNetworkConfig(v *viper.Viper) (network.Config, error) {
 }
 
 func getLoggingConfig(v *viper.Viper) logging.Config {
+	leveStr := v.GetString(LogLevelKey)
+	level := logging.ToLevel(leveStr)
 	cfg := logging.Config{
-		LogLevel: logging.Verbo,
+		LogLevel: level,
 	}
 
 	return cfg

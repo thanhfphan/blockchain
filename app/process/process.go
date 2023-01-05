@@ -43,8 +43,8 @@ func (p *Process) Start() error {
 		return err
 	}
 
-	if err := p.node.Initialize(&p.config); err != nil {
-		log.Warnf("init node failed %v", err)
+	if err := p.node.Initialize(&p.config, log); err != nil {
+		log.Fatalf("Initialize node failed %v", err)
 		return err
 	}
 
@@ -58,7 +58,7 @@ func (p *Process) Start() error {
 		}()
 
 		err := p.node.Dispatch()
-		fmt.Printf("dispatch returned err=%v\n", err)
+		log.Verbof("Dispatch returned err=%v\n", err)
 	}()
 
 	return nil

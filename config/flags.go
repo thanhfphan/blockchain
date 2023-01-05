@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/thanhfphan/blockchain/utils/constants"
+	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
 const (
@@ -14,6 +15,8 @@ const (
 	DefaultPingFrequency = 30 * time.Second
 	DefaultPingTimeout   = 10 * time.Second
 	DefaultDialerTimeout = 10 * time.Second
+
+	DefaultLogLevel = logging.VerboStr
 )
 
 func BuildFlagSet() *flag.FlagSet {
@@ -28,8 +31,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkPingTimeoutKey, DefaultPingTimeout, "Timeout value for Ping-Pong with a peer")
 	fs.Duration(NetworkDialerTimeoutKey, DefaultDialerTimeout, "Timeout value for dial with other peers")
 
-	// fs.String(PublicIPKey, DefaultStakingIPAdress, "IP of this node for P2P communication") //only support local for now
+	fs.String(PublicIPKey, DefaultStakingIPAdress, "IP of this node for P2P communication") //only support local for now
 	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
 	// fs.String(StakingTLSKeyPathKey, "", "Path to the TLS private key. If not specified, create a random one")
 	// fs.String(StakingTLSCertPathKey, "", "Path to the TLS certificate key. If not specified, create a random one")
+
+	fs.String(LogLevelKey, DefaultLogLevel, "Log level")
 }

@@ -10,4 +10,6 @@ const (
 	StakingPortKey        = "port"
 	StakingTLSKeyPathKey  = "tls-key-path"
 	StakingTLSCertPathKey = "tls-cert-path"
+
+	LogLevelKey = "log-level"
 )

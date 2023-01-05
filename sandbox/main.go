@@ -14,14 +14,22 @@ import (
 	"github.com/thanhfphan/blockchain/snow/networking/router"
 	"github.com/thanhfphan/blockchain/staking"
 	"github.com/thanhfphan/blockchain/utils/ips"
+	"github.com/thanhfphan/blockchain/utils/logging"
 	"github.com/thanhfphan/blockchain/utils/units"
 )
 
 func main() {
 	n := &node.Node{}
-
 	cfg := buildConfig()
-	err := n.Initialize(cfg)
+
+	logFactory := logging.NewFactory(cfg.LoggingConfig)
+	log, err := logFactory.Make("sandbox")
+	if err != nil {
+		logFactory.Close()
+		os.Exit(1)
+	}
+
+	err = n.Initialize(cfg, log)
 	if err != nil {
 		panic(err)
 	}
@@ -75,6 +83,12 @@ func buildConfig() *node.Config {
 		PeerWriteBufferSize: 8 * units.KiB,
 	}
 
+	cfg.LoggingConfig = logging.Config{
+		LogLevel:   logging.Verbo,
+		LoggerName: "sandbox",
+	}
+
 	cfg.ConsensusRouter = &router.ChainRouter{}
+
 	return cfg
 }
