@@ -57,14 +57,14 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	}
 
 	select {
-	case q.queue <- msg:
-		return true
 	case <-ctxDone:
 		q.logMessage("dropping message cause cancelled context\n")
 		return false
 	case <-q.closing:
 		q.logMessage("dropping message cause channel close\n")
 		return false
+	case q.queue <- msg:
+		return true
 	}
 }
 

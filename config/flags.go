@@ -12,8 +12,8 @@ const (
 	DefaultStakingPort     = 4012
 	DefaultStakingIPAdress = "127.0.0.1"
 
-	DefaultPingFrequency = 30 * time.Second
 	DefaultPingTimeout   = 10 * time.Second
+	DefaultPingFrequency = 3 * DefaultPingTimeout / 4
 	DefaultDialerTimeout = 10 * time.Second
 
 	DefaultLogLevel = logging.VerboStr

@@ -15,7 +15,7 @@ var (
 )
 
 type Upgrader interface {
-	Upgrader(net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error)
+	Upgrade(net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error)
 }
 
 func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
@@ -43,7 +43,7 @@ func NewServerUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsServerUpgrader) Upgrader(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
+func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
 	return connToIDAndCert(tls.Server(conn, t.config))
 }
 
@@ -58,6 +58,6 @@ func NewClientUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsClientUpgrader) Upgrader(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
+func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
 	return connToIDAndCert(tls.Client(conn, t.config))
 }

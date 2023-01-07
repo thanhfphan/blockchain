@@ -26,7 +26,7 @@ func Test_BlockingQueue(t *testing.T) {
 	numToSend := 10
 
 	for i := 0; i < numToSend; i++ {
-		m, err := mc.Pong()
+		m, err := mc.Pong("")
 		if err != nil {
 			t.Error(err)
 		}
@@ -57,7 +57,7 @@ func Test_BlockingQueue_CtxCancelledAndQueueIsClosed(t *testing.T) {
 
 	mc := newMsgCreator(t)
 
-	msg, err := mc.Pong()
+	msg, err := mc.Pong("")
 	if err != nil {
 		t.Error(err)
 	}

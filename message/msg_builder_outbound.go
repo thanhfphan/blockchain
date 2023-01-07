@@ -1,13 +1,17 @@
 package message
 
-import "time"
+import (
+	"fmt"
+
+	"github.com/thanhfphan/blockchain/ids"
+)
 
 var _ OutboundMsgBuilder = (*outboundMsgBuilder)(nil)
 
 type OutboundMsgBuilder interface {
-	Hello() (OutboundMessage, error)
+	Hello(nodeID ids.NodeID) (OutboundMessage, error)
 	Ping() (OutboundMessage, error)
-	Pong() (OutboundMessage, error)
+	Pong(msg string) (OutboundMessage, error)
 }
 
 type outboundMsgBuilder struct {
@@ -20,12 +24,11 @@ func newOutboundBuilder(builder *msgBuilder) OutboundMsgBuilder {
 	}
 }
 
-func (mb *outboundMsgBuilder) Hello() (OutboundMessage, error) {
+func (mb *outboundMsgBuilder) Hello(nodeID ids.NodeID) (OutboundMessage, error) {
 	return mb.builder.createOutbound(&Message{
 		Type: MessageTypeHello,
 		Message: &MessageHello{
-			MyTime:  uint64(time.Now().Unix()),
-			Message: "hello there",
+			Message: fmt.Sprintf("hello %s", nodeID.String()),
 		},
 	})
 }
@@ -39,11 +42,11 @@ func (mb *outboundMsgBuilder) Ping() (OutboundMessage, error) {
 	})
 }
 
-func (mb *outboundMsgBuilder) Pong() (OutboundMessage, error) {
+func (mb *outboundMsgBuilder) Pong(msg string) (OutboundMessage, error) {
 	return mb.builder.createOutbound(&Message{
 		Type: MessageTypePong,
 		Message: &MessagePong{
-			Message: "pong",
+			Message: msg,
 		},
 	})
 }

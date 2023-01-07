@@ -213,7 +213,7 @@ func (n *network) Dispatch() error {
 func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// TODO: set timeout Upgrade
 
-	nodeID, tlsConn, cert, err := upgrader.Upgrader(conn)
+	nodeID, tlsConn, cert, err := upgrader.Upgrade(conn)
 	if err != nil {
 		_ = conn.Close()
 		n.log.Errorf("Upgrade connection failed %v\n", err)
@@ -226,7 +226,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		return err
 	}
 
-	if nodeID == n.config.MyNodeID {
+	if nodeID.String() == n.config.MyNodeID.String() {
 		_ = tlsConn.Close()
 		n.log.Verbof("Dropping connection to myslef\n")
 		return nil
