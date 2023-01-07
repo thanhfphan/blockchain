@@ -45,6 +45,7 @@ func (p *Process) Start() error {
 
 	if err := p.node.Initialize(&p.config, log); err != nil {
 		log.Fatalf("Initialize node failed %v", err)
+		logFactory.Close()
 		return err
 	}
 
@@ -54,6 +55,7 @@ func (p *Process) Start() error {
 			if r := recover(); r != nil {
 				fmt.Println("caught panic", r)
 			}
+			logFactory.Close()
 			p.exitWG.Done()
 		}()
 
