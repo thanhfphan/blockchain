@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/x509"
-	"encoding/json"
 	"io"
 	"net"
 	"sync"
@@ -16,7 +15,6 @@ import (
 	"github.com/thanhfphan/blockchain/utils"
 	"github.com/thanhfphan/blockchain/utils/constants"
 	"github.com/thanhfphan/blockchain/utils/logging"
-	"github.com/thanhfphan/blockchain/utils/wrappers"
 )
 
 var (
@@ -28,6 +26,7 @@ type Peer interface {
 	ID() ids.NodeID
 	Send(ctx context.Context, message message.OutboundMessage) bool
 	StartClose()
+	StartSendPeerList()
 }
 
 type peer struct {
@@ -46,6 +45,9 @@ type peer struct {
 	conClosingCtxCancel func()
 	// handle err when close
 	onClose chan struct{}
+
+	// peerListChan signals that use to send list peer to this peer
+	peerListChan chan struct{}
 }
 
 func Start(
@@ -67,6 +69,7 @@ func Start(
 		conClosingCtxCancel: onClosingCtxCancel,
 		// onClose:             make(chan struct{}),
 		numExecuting: 3,
+		peerListChan: make(chan struct{}, 1), //only send once
 	}
 
 	// number goroutine = numExecuting
@@ -97,9 +100,21 @@ func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
+func (p *peer) StartSendPeerList() {
+	select {
+	case p.peerListChan <- struct{}{}:
+	default:
+	}
+}
+
 func (p *peer) readMessages() {
+	defer func() {
+		p.StartClose()
+		p.close()
+	}()
+
 	reader := bufio.NewReaderSize(p.conn, p.Config.ReadBufferSize)
-	msgLenBytes := make([]byte, wrappers.IntLen)
+	msgLenBytes := make([]byte, constants.IntLen)
 	for {
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
 			p.log.Verbof("error setting the connection read timeout - readMessages")
@@ -145,7 +160,10 @@ func (p *peer) readMessages() {
 }
 
 func (p *peer) writeMessages() {
-	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
+	defer func() {
+		p.StartClose()
+		p.close()
+	}()
 
 	msg, err := p.MessageCreator.Hello(p.ID())
 	if err != nil {
@@ -153,6 +171,7 @@ func (p *peer) writeMessages() {
 		return
 	}
 
+	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
 	p.writeMessage(writer, msg)
 
 	for {
@@ -192,9 +211,54 @@ func (p *peer) writeMessage(writer *bufio.Writer, msg message.OutboundMessage) {
 	}
 
 	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
-	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
+	if _, err := io.CopyN(writer, &buf, int64(constants.IntLen+msgLen)); err != nil {
 		p.log.Verbof("error writing message %v\n", err)
 		return
+	}
+}
+
+func (p *peer) sendNetworkMessages() {
+	sendPingsTicker := time.NewTicker(p.PingFrequency)
+	defer func() {
+		sendPingsTicker.Stop()
+		p.StartClose()
+		p.close()
+	}()
+
+	for {
+		select {
+		case <-p.peerListChan:
+			peerIPs, err := p.Network.Peers(p.id)
+			if err != nil {
+				p.log.Errorf("get peers failed %v", err)
+				return
+			}
+			if len(peerIPs) == 0 {
+				p.log.Debugf("skipping peerListChan cause found nobody")
+				continue
+			}
+
+			msg, err := p.MessageCreator.PeerList(peerIPs)
+			if err != nil {
+				p.log.Errorf("create PeerList message failed %v", err)
+				continue
+			}
+
+			if !p.Send(p.onClosingCtx, msg) {
+				p.log.Debugf("failed to send peer list message")
+				continue
+			}
+
+		case <-sendPingsTicker.C:
+			pingMessage, err := p.MessageCreator.Ping()
+			if err != nil {
+				p.log.Errorf("Create PING message failed %v\n", err)
+				return
+			}
+			p.Send(p.onClosingCtx, pingMessage)
+		case <-p.onClosingCtx.Done():
+			return
+		}
 	}
 }
 
@@ -209,6 +273,9 @@ func (p *peer) handle(msg message.InboundMessage) {
 	case message.HelloOp:
 		p.handleHello(msg)
 		return
+	case message.PeerListOp:
+		p.handlePeerList(msg)
+		return
 	}
 
 	if !p.finishedHandshake.GetValue() {
@@ -220,69 +287,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.log.Verbof("receive unknown message %v\n", msg)
 }
 
-func (p *peer) handlePing(_ message.InboundMessage) {
-	msg, err := p.MessageCreator.Pong(p.ID().String())
-	if err != nil {
-		p.log.Errorf("Create pong message failed %v\n", err)
-		return
-	}
-
-	p.Send(p.onClosingCtx, msg)
-}
-
-func (p *peer) handlePong(m message.InboundMessage) {
-	// FIXME: use protobuf
-	raw, err := json.Marshal(m.Message())
-	if err != nil {
-		p.log.Errorf("parse pong message failed %v", err)
-		return
-	}
-	var rootMsg message.Message
-	if err = json.Unmarshal(raw, &rootMsg); err != nil {
-		p.log.Errorf("unmarshal root pong message failed %v", err)
-		return
-	}
-
-	msgRaw, err := json.Marshal(rootMsg.Message)
-	if err != nil {
-		p.log.Errorf("marshal pong message failed")
-		return
-	}
-	var msg message.MessagePong
-	if err = json.Unmarshal(msgRaw, &msg); err != nil {
-		p.log.Errorf("unmarshal pong message failed %v", err)
-		return
-	}
-
-	p.log.Debugf("receive pong from %s", p.ID().String())
-}
-
-func (p *peer) handleHello(m message.InboundMessage) {
-	// FIXME: use protobuf
-	raw, err := json.Marshal(m.Message())
-	if err != nil {
-		p.log.Errorf("parse hello message failed %v", err)
-		return
-	}
-	var rootMsg message.Message
-	if err = json.Unmarshal(raw, &rootMsg); err != nil {
-		p.log.Errorf("unmarshal root hello message failed %v", err)
-		return
-	}
-
-	msgRaw, err := json.Marshal(rootMsg.Message)
-	if err != nil {
-		p.log.Errorf("marshal hello message failed")
-		return
-	}
-	var msg message.MessageHello
-	if err = json.Unmarshal(msgRaw, &msg); err != nil {
-		p.log.Errorf("unmarshal hello message failed %v", err)
-		return
-	}
-	p.log.Debugf("receive hello from %s", p.ID().String())
-}
-
 func (p *peer) close() {
 	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
 		return
@@ -290,29 +294,6 @@ func (p *peer) close() {
 
 	p.Network.Disconnected(p.id)
 	// close(p.onClose)
-}
-
-func (p *peer) sendNetworkMessages() {
-	sendPingsTicker := time.NewTicker(p.PingFrequency)
-	defer func() {
-		sendPingsTicker.Stop()
-		p.StartClose()
-		p.close()
-	}()
-
-	for {
-		select {
-		case <-sendPingsTicker.C:
-			pingMessage, err := p.Config.MessageCreator.Ping()
-			if err != nil {
-				p.log.Errorf("Create PING message failed %v\n", err)
-				return
-			}
-			p.Send(p.onClosingCtx, pingMessage)
-		case <-p.onClosingCtx.Done():
-			return
-		}
-	}
 }
 
 func (p *peer) nextTimeout() time.Time {

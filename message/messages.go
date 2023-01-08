@@ -15,13 +15,13 @@ var (
 type InboundMessage interface {
 	NodeID() ids.NodeID
 	Op() Op
-	Message() any
+	Message() *Message
 }
 
 type inboundMessage struct {
 	nodeID  ids.NodeID
 	op      Op
-	message any
+	message *Message
 }
 
 func (i *inboundMessage) NodeID() ids.NodeID {
@@ -32,7 +32,7 @@ func (i *inboundMessage) Op() Op {
 	return i.op
 }
 
-func (i *inboundMessage) Message() any {
+func (i *inboundMessage) Message() *Message {
 	return i.message
 }
 
@@ -94,15 +94,10 @@ func (mb *msgBuilder) parseInbound(bytes []byte, nodeID ids.NodeID) (*inboundMes
 		return nil, err
 	}
 
-	msg, err := Unwrap(m)
-	if err != nil {
-		return nil, err
-	}
-
 	return &inboundMessage{
 		nodeID:  nodeID,
 		op:      op,
-		message: msg,
+		message: m,
 	}, nil
 }
 

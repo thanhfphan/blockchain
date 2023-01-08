@@ -209,6 +209,9 @@ func (n *network) Dispatch() error {
 
 	return nil
 }
+func (n *network) Peers(peerIDs ids.NodeID) ([]ips.ClaimedIPPort, error) {
+	return nil, nil
+}
 
 func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	// TODO: set timeout Upgrade

@@ -1,4 +1,4 @@
-package wrappers
+package constants
 
 import "math"
 

@@ -11,6 +11,7 @@ const (
 	PingOp Op = iota
 	PongOp
 	HelloOp
+	PeerListOp
 )
 
 var (
@@ -25,14 +26,11 @@ func (op Op) String() string {
 		return "pong"
 	case HelloOp:
 		return "hello"
+	case PeerListOp:
+		return "peer-list"
 	default:
 		return "unknown"
 	}
-}
-
-func Unwrap(m *Message) (interface{}, error) {
-	// This func is prepare when use protobuf
-	return m, nil
 }
 
 func ToOp(m *Message) (Op, error) {
@@ -43,6 +41,8 @@ func ToOp(m *Message) (Op, error) {
 		return PongOp, nil
 	case MessageTypeHello:
 		return HelloOp, nil
+	case MessageTypePeerList:
+		return PeerListOp, nil
 	default:
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, m)
 	}
