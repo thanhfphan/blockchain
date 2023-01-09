@@ -31,4 +31,5 @@ type TimeoutConfig struct {
 type PeerGossipConfig struct {
 	PeerListNumberValidator uint
 	PeerListGossipFrequency time.Duration
+	PeerListGossipSize      uint
 }

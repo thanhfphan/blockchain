@@ -12,6 +12,8 @@ const (
 	DefaultStakingPort           = 4012
 	DefaultStakingIPAdress       = "127.0.0.1"
 	DefaultNumberValidatorOfPeer = 10
+	DefaultPeerListGossipSize    = 10
+	DefaultPeerListFrequency     = 10 * time.Second
 
 	DefaultPingTimeout   = 10 * time.Second
 	DefaultPingFrequency = 3 * DefaultPingTimeout / 4
@@ -32,6 +34,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkPingTimeoutKey, DefaultPingTimeout, "Timeout value for Ping-Pong with a peer")
 	fs.Duration(NetworkDialerTimeoutKey, DefaultDialerTimeout, "Timeout value for dial with other peers")
 	fs.Uint(NetworkNumberValidatorOfPeerKey, DefaultNumberValidatorOfPeer, "Number validator of a peer")
+	fs.Uint(NetworkPeerListGossipSizeKey, DefaultPeerListGossipSize, "Number validator to run gossip timer")
+	fs.Duration(NetworkPeerListGossipFrequencyKey, DefaultPeerListFrequency, "Frequency gossip peers")
 
 	fs.String(PublicIPKey, DefaultStakingIPAdress, "IP of this node for P2P communication") //only support local for now
 	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")

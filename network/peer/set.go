@@ -3,7 +3,6 @@ package peer
 import (
 	"errors"
 
-	"github.com/labstack/gommon/log"
 	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/utils/sampler"
 )
@@ -89,7 +88,6 @@ func (s *set) Sample(n int, precondition func(Peer) bool) []Peer {
 	for len(peers) < n {
 		index, err := sampler.Next()
 		if err != nil {
-			log.Warnf("sample next failed %v", err)
 			break
 		}
 		peer := s.peersSlice[index]

@@ -81,6 +81,11 @@ func buildConfig() *node.Config {
 		},
 		PeerReadBufferSize:  8 * units.KiB,
 		PeerWriteBufferSize: 8 * units.KiB,
+		PeerGossipConfig: network.PeerGossipConfig{
+			PeerListNumberValidator: config.DefaultNumberValidatorOfPeer,
+			PeerListGossipFrequency: config.DefaultPeerListFrequency,
+			PeerListGossipSize:      config.DefaultPeerListGossipSize,
+		},
 	}
 
 	cfg.LoggingConfig = logging.Config{

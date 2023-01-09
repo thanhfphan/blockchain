@@ -190,7 +190,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 
 // Dispatch start to accepting connections from other nodes to connect to this node
 func (n *network) Dispatch() error {
-
+	go n.runTimers()
 	for {
 		if n.onCloseCtx.Err() != nil {
 			break
@@ -349,4 +349,27 @@ func (n *network) samplePeers(numberPeersToSample int) []peer.Peer {
 
 func preconditionSample(p peer.Peer) bool {
 	return true
+}
+
+func (n *network) gossipPeerList() {
+	peers := n.samplePeers(int(n.config.PeerListGossipSize))
+	for _, p := range peers {
+		p.StartSendPeerList()
+	}
+}
+
+func (n *network) runTimers() {
+	gossipPeerList := time.NewTicker(n.config.PeerListGossipFrequency)
+	defer func() {
+		gossipPeerList.Stop()
+	}()
+
+	for {
+		select {
+		case <-n.onCloseCtx.Done():
+			return
+		case <-gossipPeerList.C:
+			n.gossipPeerList()
+		}
+	}
 }

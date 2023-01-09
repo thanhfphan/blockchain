@@ -116,6 +116,8 @@ func getNetworkConfig(v *viper.Viper) (network.Config, error) {
 		PeerWriteBufferSize: 8 * units.KiB,
 		PeerGossipConfig: network.PeerGossipConfig{
 			PeerListNumberValidator: v.GetUint(NetworkNumberValidatorOfPeerKey),
+			PeerListGossipFrequency: v.GetDuration(NetworkPeerListGossipFrequencyKey),
+			PeerListGossipSize:      v.GetUint(NetworkPeerListGossipSizeKey),
 		},
 	}
 
