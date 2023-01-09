@@ -13,4 +13,6 @@ type Config struct {
 	PingFrequency   time.Duration
 	ReadBufferSize  int
 	WriteBufferSize int
+
+	IPSigner *IPSigner
 }

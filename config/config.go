@@ -104,19 +104,19 @@ func getBootstrapConfig() (node.BootstrapConfig, error) {
 }
 
 func getNetworkConfig(v *viper.Viper) (network.Config, error) {
-	pingFrequency := v.GetDuration(NetworkPingFrequencyKey)
-	pingTimeout := v.GetDuration(NetworkPingTimeoutKey)
-	dialerTimeout := v.GetDuration(NetworkDialerTimeoutKey)
 	config := network.Config{
 		TimeoutConfig: network.TimeoutConfig{
-			PongTimeout:   pingTimeout,
-			PingFrequency: pingFrequency,
+			PongTimeout:   v.GetDuration(NetworkPingTimeoutKey),
+			PingFrequency: v.GetDuration(NetworkPingFrequencyKey),
 		},
 		DialerConfig: dialer.Config{
-			ConnectionTimeout: dialerTimeout,
+			ConnectionTimeout: v.GetDuration(NetworkDialerTimeoutKey),
 		},
 		PeerReadBufferSize:  8 * units.KiB,
 		PeerWriteBufferSize: 8 * units.KiB,
+		PeerGossipConfig: network.PeerGossipConfig{
+			PeerListNumberValidator: v.GetUint(NetworkNumberValidatorOfPeerKey),
+		},
 	}
 
 	return config, nil

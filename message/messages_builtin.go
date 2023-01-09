@@ -23,8 +23,11 @@ type MessagePong struct {
 }
 
 type MessageHello struct {
-	Message string `json:"message"`
-	MyTime  uint64 `json:"my_time"`
+	HelloTime  uint64 `json:"hello_time"`
+	IPAddress  []byte `json:"ip_address"`
+	IPPort     uint16 `json:"ip_port"`
+	SignedTime uint64 `json:"signed_time:`
+	Signature  []byte `json:"signature"`
 }
 
 type MessagePeerList struct {
@@ -32,8 +35,10 @@ type MessagePeerList struct {
 }
 
 type PeerList struct {
-	Cert      []byte
-	IP        []byte
-	Port      uint16
-	Signature []byte
+	Cert      []byte `json:"cert"`
+	IPAddress []byte `json:"ip_address"`
+	IPPort    uint16 `json:"ip_port"`
+	Signature []byte `json:"signature"`
+	TxID      []byte `json:"tx_id"`
+	Timestamp uint64 `json:"timestamp"`
 }

@@ -9,5 +9,5 @@ type Network interface {
 	Connected(id ids.NodeID)
 	Disconnected(ids ids.NodeID)
 	// Peers return peers that [PeerID] might not know about.
-	Peers(peerIDs ids.NodeID) ([]ips.ClaimedIPPort, error)
+	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)
 }

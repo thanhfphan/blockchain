@@ -14,6 +14,7 @@ import (
 	"github.com/thanhfphan/blockchain/message"
 	"github.com/thanhfphan/blockchain/utils"
 	"github.com/thanhfphan/blockchain/utils/constants"
+	"github.com/thanhfphan/blockchain/utils/ips"
 	"github.com/thanhfphan/blockchain/utils/logging"
 )
 
@@ -24,6 +25,9 @@ var (
 
 type Peer interface {
 	ID() ids.NodeID
+	Cert() *x509.Certificate
+	IP() *ips.SignedIP
+
 	Send(ctx context.Context, message message.OutboundMessage) bool
 	StartClose()
 	StartSendPeerList()
@@ -31,14 +35,17 @@ type Peer interface {
 
 type peer struct {
 	*Config
-	log          logging.Logger
-	id           ids.NodeID
-	conn         net.Conn
-	cert         *x509.Certificate
-	messageQueue MessageQueue
+	log  logging.Logger
+	id   ids.NodeID
+	conn net.Conn
+	cert *x509.Certificate
+	ip   *ips.SignedIP
 
-	finishedHandshake utils.AtomicBool
+	messageQueue  MessageQueue
+	gossipTracker GossipTracker
 
+	finishedHandshake   utils.AtomicBool
+	gotHello            utils.AtomicBool
 	numExecuting        int64
 	startClosingOnce    sync.Once
 	onClosingCtx        context.Context
@@ -56,7 +63,9 @@ func Start(
 	conn net.Conn,
 	cert *x509.Certificate,
 	nodeID ids.NodeID,
-	msgQueue MessageQueue) Peer {
+	msgQueue MessageQueue,
+	gossipTracker GossipTracker,
+) Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
 		Config:              config,
@@ -64,13 +73,17 @@ func Start(
 		id:                  nodeID,
 		conn:                conn,
 		cert:                cert,
-		messageQueue:        msgQueue,
 		onClosingCtx:        onClosingCtx,
 		conClosingCtxCancel: onClosingCtxCancel,
 		// onClose:             make(chan struct{}),
 		numExecuting: 3,
 		peerListChan: make(chan struct{}, 1), //only send once
+
+		messageQueue:  msgQueue,
+		gossipTracker: gossipTracker,
 	}
+
+	p.gossipTracker.StartTrackingPeer(nodeID)
 
 	// number goroutine = numExecuting
 	go p.readMessages()
@@ -82,6 +95,14 @@ func Start(
 
 func (p *peer) ID() ids.NodeID {
 	return p.id
+}
+
+func (p *peer) IP() *ips.SignedIP {
+	return p.ip
+}
+
+func (p *peer) Cert() *x509.Certificate {
+	return p.cert
 }
 
 func (p *peer) StartClose() {
@@ -165,7 +186,18 @@ func (p *peer) writeMessages() {
 		p.close()
 	}()
 
-	msg, err := p.MessageCreator.Hello(p.ID())
+	signedIP, err := p.IPSigner.GetSignedIP()
+	if err != nil {
+		p.log.Errorf("get signed IP failed %v", err)
+		return
+	}
+
+	msg, err := p.MessageCreator.Hello(
+		uint64(time.Now().Unix()),
+		signedIP.IP.IP,
+		signedIP.IP.Timestamp,
+		signedIP.Signature,
+	)
 	if err != nil {
 		p.log.Errorf("Create msg hello failed %v\n", err)
 		return
@@ -292,6 +324,7 @@ func (p *peer) close() {
 		return
 	}
 
+	p.gossipTracker.StopTrackingPeer(p.id)
 	p.Network.Disconnected(p.id)
 	// close(p.onClose)
 }

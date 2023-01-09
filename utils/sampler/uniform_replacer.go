@@ -67,7 +67,11 @@ func (u *uniformReplacer) Next() (uint64, error) {
 	if val, ok := u.drawn[draw]; ok {
 		ret = val
 	}
-	u.drawn[draw] = u.drawsCount
+	if val, ok := u.drawn[u.drawsCount]; !ok {
+		u.drawn[draw] = val
+	} else {
+		u.drawn[draw] = u.drawsCount
+	}
 	u.drawsCount++
 
 	return ret, nil

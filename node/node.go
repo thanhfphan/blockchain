@@ -1,6 +1,7 @@
 package node
 
 import (
+	"crypto"
 	"fmt"
 	"net"
 	"sync"
@@ -108,7 +109,18 @@ func (n *Node) initNetworking() error {
 		return err
 	}
 
+	gossipTracker, err := peer.NewGossipTracker()
+	if err != nil {
+		return err
+	}
+
+	tlsSignerIPKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return fmt.Errorf("cant get tlsSignerIPKey")
+	}
+
 	n.Config.NetworkConfig.TLSConfig = peer.TLSConfig(n.Config.StakingTLSCert)
+	n.Config.NetworkConfig.TLSSignIPKey = tlsSignerIPKey
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.IPPort = n.Config.IPPort
 
@@ -118,6 +130,7 @@ func (n *Node) initNetworking() error {
 		msgCreator,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig),
+		gossipTracker,
 	)
 	if err != nil {
 		n.log.Errorf("Initialize networking error=%v\n", err)

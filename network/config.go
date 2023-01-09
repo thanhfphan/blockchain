@@ -1,6 +1,7 @@
 package network
 
 import (
+	"crypto"
 	"crypto/tls"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 type Config struct {
 	TLSConfig           *tls.Config
+	TLSSignIPKey        crypto.Signer
 	MyNodeID            ids.NodeID
 	IPPort              ips.DynamicIPPort
 	DialerConfig        dialer.Config
@@ -18,9 +20,15 @@ type Config struct {
 	PeerWriteBufferSize int
 
 	TimeoutConfig
+	PeerGossipConfig
 }
 
 type TimeoutConfig struct {
 	PongTimeout   time.Duration
 	PingFrequency time.Duration
+}
+
+type PeerGossipConfig struct {
+	PeerListNumberValidator uint
+	PeerListGossipFrequency time.Duration
 }

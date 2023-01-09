@@ -30,7 +30,7 @@ func IDFromString(idStr string) (ID, error) {
 
 func IDFromPrefixedString(idStr, prefix string) (ID, error) {
 	if !strings.HasPrefix(idStr, prefix) {
-		return IDEmpty, errors.New("invalid type of nodeID")
+		return IDEmpty, errors.New("prefix is not correct")
 	}
 	return IDFromString(strings.TrimPrefix(idStr, prefix))
 }

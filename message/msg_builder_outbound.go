@@ -1,16 +1,18 @@
 package message
 
 import (
-	"fmt"
-
-	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
 var _ OutboundMsgBuilder = (*outboundMsgBuilder)(nil)
 
 type OutboundMsgBuilder interface {
-	Hello(nodeID ids.NodeID) (OutboundMessage, error)
+	Hello(
+		helloTime uint64,
+		ip ips.IPPort,
+		signTime uint64,
+		sig []byte,
+	) (OutboundMessage, error)
 	Ping() (OutboundMessage, error)
 	Pong(msg string) (OutboundMessage, error)
 	PeerList(peerIPs []ips.ClaimedIPPort) (OutboundMessage, error)
@@ -26,11 +28,21 @@ func newOutboundBuilder(builder *msgBuilder) OutboundMsgBuilder {
 	}
 }
 
-func (mb *outboundMsgBuilder) Hello(nodeID ids.NodeID) (OutboundMessage, error) {
+func (mb *outboundMsgBuilder) Hello(
+	helloTime uint64,
+	ip ips.IPPort,
+	signedTime uint64,
+	signature []byte,
+
+) (OutboundMessage, error) {
 	return mb.builder.createOutbound(&Message{
 		Type: MessageTypeHello,
 		Message: &MessageHello{
-			Message: fmt.Sprintf("hello %s", nodeID.String()),
+			HelloTime:  helloTime,
+			IPAddress:  ip.IP.To16(),
+			IPPort:     ip.Port,
+			Signature:  signature,
+			SignedTime: signedTime,
 		},
 	})
 }
@@ -57,9 +69,11 @@ func (mb *outboundMsgBuilder) PeerList(peerIPs []ips.ClaimedIPPort) (OutboundMes
 	for i, p := range peerIPs {
 		peerList[i] = &PeerList{
 			Cert:      p.Cert.Raw,
-			IP:        p.IPPort.IP.To16(),
-			Port:      p.IPPort.Port,
+			IPAddress: p.IPPort.IP.To16(),
+			IPPort:    p.IPPort.Port,
 			Signature: p.Signature,
+			TxID:      p.TxID[:],
+			Timestamp: p.TimeStamp,
 		}
 	}
 	return mb.builder.createOutbound(&Message{

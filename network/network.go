@@ -13,6 +13,7 @@ import (
 	"github.com/thanhfphan/blockchain/snow/networking/sender"
 	"github.com/thanhfphan/blockchain/utils/ips"
 	"github.com/thanhfphan/blockchain/utils/logging"
+	"github.com/thanhfphan/blockchain/utils/sampler"
 )
 
 var _ Network = (*network)(nil)
@@ -47,6 +48,8 @@ type network struct {
 	closeOnce        sync.Once
 	onCloseCtx       context.Context
 	onCloseCtxCancel func()
+
+	gossiptracker peer.GossipTracker
 }
 
 func New(
@@ -55,6 +58,7 @@ func New(
 	msgCreator message.Creator,
 	listener net.Listener,
 	dialer dialer.Dialer,
+	gossipTracker peer.GossipTracker,
 ) (Network, error) {
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -65,7 +69,7 @@ func New(
 		ReadBufferSize:  config.PeerReadBufferSize,
 		WriteBufferSize: config.PeerWriteBufferSize,
 
-		//Beacons //TODO
+		IPSigner: peer.NewIPSigner(config.IPPort, config.TLSSignIPKey),
 	}
 
 	n := &network{
@@ -82,6 +86,8 @@ func New(
 
 		clientUpgrader: peer.NewClientUpgrader(config.TLSConfig),
 		serverUpgrader: peer.NewServerUpgrader(config.TLSConfig),
+
+		gossiptracker: gossipTracker,
 	}
 
 	n.peerConfig.Network = n
@@ -209,8 +215,45 @@ func (n *network) Dispatch() error {
 
 	return nil
 }
-func (n *network) Peers(peerIDs ids.NodeID) ([]ips.ClaimedIPPort, error) {
-	return nil, nil
+func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
+	unknown, ok := n.gossiptracker.GetUnknown(peerID)
+	if !ok {
+		n.log.Debugf("not found any unknown of peer %s to gossip to", peerID.String())
+		return nil, nil
+	}
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(unknown))); err != nil {
+		return nil, err
+	}
+
+	validators := make([]ips.ClaimedIPPort, 0, int(n.config.PeerListNumberValidator))
+
+	for i := 0; i < len(unknown) && len(validators) < int(n.config.PeerListNumberValidator); i++ {
+		draw, err := s.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		v := unknown[draw]
+		n.peersLock.RLock()
+		p, ok := n.connectedPeers.GetByID(v.NodeID)
+		n.peersLock.RUnlock()
+		if !ok {
+			n.log.Debugf("not found %s in list connected peers", v.NodeID)
+			continue
+		}
+		peerIP := p.IP()
+		validators = append(validators, ips.ClaimedIPPort{
+			Cert:      p.Cert(),
+			IPPort:    peerIP.IP.IP,
+			Signature: peerIP.Signature,
+			TimeStamp: peerIP.IP.Timestamp,
+			TxID:      v.TxID,
+		})
+	}
+
+	return validators, nil
 }
 
 func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
@@ -249,7 +292,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	msgQueue := peer.NewBlockingQueue(maxMessageInQueue, n.log)
-	peer := peer.Start(n.peerConfig, n.log, tlsConn, cert, nodeID, msgQueue)
+	peer := peer.Start(n.peerConfig, n.log, tlsConn, cert, nodeID, msgQueue, n.gossiptracker)
 	n.connectingPeers.Add(peer)
 	return nil
 }
