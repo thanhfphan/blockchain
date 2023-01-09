@@ -308,6 +308,9 @@ func (p *peer) handle(msg message.InboundMessage) {
 	case message.PeerListOp:
 		p.handlePeerList(msg)
 		return
+	case message.PeerListAckOp:
+		p.handlePeerListAck(msg)
+		return
 	}
 
 	if !p.finishedHandshake.GetValue() {

@@ -1,6 +1,7 @@
 package message
 
 import (
+	"github.com/thanhfphan/blockchain/ids"
 	"github.com/thanhfphan/blockchain/utils/ips"
 )
 
@@ -16,6 +17,7 @@ type OutboundMsgBuilder interface {
 	Ping() (OutboundMessage, error)
 	Pong(msg string) (OutboundMessage, error)
 	PeerList(peerIPs []ips.ClaimedIPPort) (OutboundMessage, error)
+	PeerListAck(txIDs []ids.ID) (OutboundMessage, error)
 }
 
 type outboundMsgBuilder struct {
@@ -82,4 +84,22 @@ func (mb *outboundMsgBuilder) PeerList(peerIPs []ips.ClaimedIPPort) (OutboundMes
 			PeerList: peerList,
 		},
 	})
+}
+func (mb *outboundMsgBuilder) PeerListAck(txIDs []ids.ID) (OutboundMessage, error) {
+	bytes := make([][]byte, len(txIDs))
+	encodeIDS(txIDs, bytes)
+
+	return mb.builder.createOutbound(&Message{
+		Type: MessageTypePeerAckList,
+		Message: &MessagePeerListAck{
+			TxIDs: bytes,
+		},
+	})
+}
+
+func encodeIDS(ids []ids.ID, result [][]byte) {
+	for i, id := range ids {
+		c := id
+		result[i] = c[:]
+	}
 }

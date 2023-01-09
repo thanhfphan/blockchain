@@ -3,10 +3,11 @@ package message
 type MessageType string
 
 const (
-	MessageTypePing     MessageType = "ping"
-	MessageTypePong     MessageType = "pong"
-	MessageTypeHello    MessageType = "hello"
-	MessageTypePeerList MessageType = "peer-list"
+	MessageTypePing        MessageType = "ping"
+	MessageTypePong        MessageType = "pong"
+	MessageTypeHello       MessageType = "hello"
+	MessageTypePeerList    MessageType = "peer-list"
+	MessageTypePeerAckList MessageType = "peer-list-ack"
 )
 
 type Message struct {
@@ -26,7 +27,7 @@ type MessageHello struct {
 	HelloTime  uint64 `json:"hello_time"`
 	IPAddress  []byte `json:"ip_address"`
 	IPPort     uint16 `json:"ip_port"`
-	SignedTime uint64 `json:"signed_time:`
+	SignedTime uint64 `json:"signed_time"`
 	Signature  []byte `json:"signature"`
 }
 
@@ -41,4 +42,8 @@ type PeerList struct {
 	Signature []byte `json:"signature"`
 	TxID      []byte `json:"tx_id"`
 	Timestamp uint64 `json:"timestamp"`
+}
+
+type MessagePeerListAck struct {
+	TxIDs [][]byte `json:"tx_ids"`
 }

@@ -132,8 +132,52 @@ func (p *peer) handlePeerList(m message.InboundMessage) {
 		return
 	}
 
-	// TODO: send peer list ack
-	_ = trackedTxIDs
+	if len(trackedTxIDs) == 0 {
+		p.log.Debugf("skipping peerListAck cause there were no trackedIDs")
+		return
+	}
+
+	ackMsg, err := p.MessageCreator.PeerListAck(trackedTxIDs)
+	if err != nil {
+		p.log.Errorf("create peerListAck message failed %v", err)
+		return
+	}
+
+	if !p.Send(p.onClosingCtx, ackMsg) {
+		p.log.Debugf("send peerListAck message failed")
+	}
 
 	p.log.Debugf("receive peer listfrom %v", msg.PeerList)
+}
+
+func (p *peer) handlePeerListAck(m message.InboundMessage) {
+	// FIXME: use protobuf
+	msgRaw, err := json.Marshal(m.Message().Message)
+	if err != nil {
+		p.log.Errorf("marshal peer list ack message failed")
+		return
+	}
+	var msg message.MessagePeerListAck
+	if err = json.Unmarshal(msgRaw, &msg); err != nil {
+		p.log.Errorf("unmarshal peer list message ack failed %v", err)
+		return
+	}
+
+	txIDs := make([]ids.ID, len(msg.TxIDs))
+	for i, item := range msg.TxIDs {
+		txID, err := ids.ToID(item)
+		if err != nil {
+			p.log.Errorf("parse ID peer list ack failed %v", err)
+			p.StartClose()
+			return
+		}
+
+		txIDs[i] = txID
+	}
+
+	if _, ok := p.gossipTracker.AddKnown(p.id, txIDs); !ok {
+		p.log.Warnf("update known peers failed from peerListAck")
+	}
+
+	p.log.Debugf("handle peerListAck with txIDs=%v", txIDs)
 }

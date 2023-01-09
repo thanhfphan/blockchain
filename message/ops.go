@@ -12,6 +12,7 @@ const (
 	PongOp
 	HelloOp
 	PeerListOp
+	PeerListAckOp
 )
 
 var (
@@ -28,6 +29,8 @@ func (op Op) String() string {
 		return "hello"
 	case PeerListOp:
 		return "peer-list"
+	case PeerListAckOp:
+		return "peer-list-ack"
 	default:
 		return "unknown"
 	}
@@ -43,6 +46,8 @@ func ToOp(m *Message) (Op, error) {
 		return HelloOp, nil
 	case MessageTypePeerList:
 		return PeerListOp, nil
+	case MessageTypePeerAckList:
+		return PeerListAckOp, nil
 	default:
 		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, m)
 	}
