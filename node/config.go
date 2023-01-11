@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	ConsensusRouter router.Router
 	IPConfig
 	StakingConfig
 	BootstrapConfig
-	NetworkConfig network.Config
-	LoggingConfig logging.Config
+
+	ConsensusRouter router.Router
+	NetworkConfig   network.Config
+	LoggingConfig   logging.Config
 }
 
 type IPConfig struct {
@@ -25,8 +26,7 @@ type IPConfig struct {
 
 type StakingConfig struct {
 	StakingTLSCert tls.Certificate
-	//TODO:
-	// StakingSigningKey
+	// StakingSigningKey *bls
 }
 
 type BootstrapConfig struct {

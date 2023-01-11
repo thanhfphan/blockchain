@@ -3,5 +3,5 @@ package constants
 import "github.com/thanhfphan/blockchain/ids"
 
 var (
-	PlatformChainID = ids.IDEmpty
+	PlatformVMID = ids.ID{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm'}
 )

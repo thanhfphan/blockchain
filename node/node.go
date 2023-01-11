@@ -18,11 +18,13 @@ import (
 )
 
 type Node struct {
-	ID            ids.NodeID
-	Net           network.Network
-	ChainsManager chains.Manager
-	Config        *Config
+	ID     ids.NodeID
+	Net    network.Network
+	Config *Config
+
 	log           logging.Logger
+	chainsManager chains.Manager
+	msgCreator    message.Creator
 
 	shuttingDown         utils.AtomicBool
 	shuttingDownExitCode utils.AtomicInterface
@@ -38,6 +40,12 @@ func (n *Node) Initialize(config *Config, log logging.Logger) error {
 	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
 
 	n.log.Infof("Starting %s\n", n.ID.String())
+
+	msgCreator, err := message.NewCreator()
+	if err != nil {
+		return err
+	}
+	n.msgCreator = msgCreator
 
 	// TODO: init beacons
 
@@ -104,11 +112,6 @@ func (n *Node) initNetworking() error {
 
 	n.log.Infof("Initializing networking at: %s\n", curIPPort.String())
 
-	msgCreator, err := message.NewCreator()
-	if err != nil {
-		return err
-	}
-
 	gossipTracker, err := peer.NewGossipTracker()
 	if err != nil {
 		return err
@@ -127,7 +130,7 @@ func (n *Node) initNetworking() error {
 	n.Net, err = network.New(
 		&n.Config.NetworkConfig,
 		n.log,
-		msgCreator,
+		n.msgCreator,
 		listener,
 		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig),
 		gossipTracker,
@@ -146,17 +149,24 @@ func (n *Node) initChainManager() error {
 	if err != nil {
 		return err
 	}
-	n.ChainsManager = chains.New(chains.ManagerConfig{
-		Net:    n.Net,
-		Router: n.Config.ConsensusRouter,
+
+	n.chainsManager = chains.New(n.log, chains.ManagerConfig{
+		Net:              n.Net,
+		Router:           n.Config.ConsensusRouter,
+		NodeID:           n.ID,
+		ShutdownNodeFunc: n.Shutdown,
+		MsgCreator:       n.msgCreator,
+		StakingCert:      n.Config.StakingTLSCert,
+		// StakingSigningKey
 	})
+
 	return nil
 }
 
 func (n *Node) initChains() {
 	n.log.Infof("Initializing chains")
-	n.ChainsManager.StartChainCreator(&chains.Chainparameters{
-		ID:          100,
+	n.chainsManager.StartChainCreator(&chains.Chainparameters{
+		ID:          ids.IDEmpty,
 		GenesisData: []byte("genesis data"),
 	})
 }
