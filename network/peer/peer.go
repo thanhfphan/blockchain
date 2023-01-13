@@ -16,6 +16,7 @@ import (
 	"github.com/thanhfphan/blockchain/utils/constants"
 	"github.com/thanhfphan/blockchain/utils/ips"
 	"github.com/thanhfphan/blockchain/utils/logging"
+	"github.com/thanhfphan/blockchain/utils/timer"
 )
 
 var (
@@ -35,11 +36,12 @@ type Peer interface {
 
 type peer struct {
 	*Config
-	log  logging.Logger
-	id   ids.NodeID
-	conn net.Conn
-	cert *x509.Certificate
-	ip   *ips.SignedIP
+	log   logging.Logger
+	id    ids.NodeID
+	conn  net.Conn
+	cert  *x509.Certificate
+	ip    *ips.SignedIP
+	clock timer.Clock
 
 	messageQueue  MessageQueue
 	gossipTracker GossipTracker
@@ -333,6 +335,5 @@ func (p *peer) close() {
 }
 
 func (p *peer) nextTimeout() time.Time {
-	// FIXME: replace time.Now with clock can be mock for test
-	return time.Now().Add(p.PongTimeout)
+	return p.clock.Now().Add(p.PongTimeout)
 }

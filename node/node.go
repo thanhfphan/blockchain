@@ -95,11 +95,9 @@ func (n *Node) Shutdown(exitCode int) {
 
 func (n *Node) shutdown() {
 	n.log.Infof("Shutting down %s", n.ID.String())
-
 	n.Net.StartClose()
 
 	n.doneShuttingDown.Done()
-
 	n.log.Infof("Finished shutdown %s", n.ID.String())
 }
 
@@ -116,6 +114,10 @@ func (n *Node) initNetworking() error {
 	if err != nil {
 		return err
 	}
+
+	dummyTxID := ids.IDEmpty
+	copy(dummyTxID[:], n.ID[:])
+	gossipTracker.AddKnown(n.ID, []ids.ID{dummyTxID})
 
 	tlsSignerIPKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
