@@ -39,6 +39,7 @@ require (
 	github.com/labstack/gommon v0.4.0
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	go.uber.org/zap v1.24.0
+	golang.org/x/exp v0.0.0-20230111222715-75897c7a292a
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.3.0 // indirect
 )
